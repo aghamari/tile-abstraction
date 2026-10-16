@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MFMA C · 16×16 f32 accumulator onto lanes and VGPRs</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --g0: #cfe3f7;
+        --g0s: #3c7bbf;
+        --g1: #f6dcc0;
+        --g1s: #c47b2b;
+        --g2: #cfeedd;
+        --g2s: #2f8a5c;
+        --g3: #e6d6f2;
+        --g3s: #7d4fae;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      code { font-family: var(--mono); }
+      header {
+        padding: 10px 16px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      header strong { font-size: 15px; }
+      header small { color: var(--muted); font-size: 12px; }
+      .switch { margin-left: auto; display: flex; gap: 6px; }
+      .switch a {
+        text-decoration: none;
+        color: var(--ink);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 650;
+        background: white;
+      }
+      .switch a.on { border-color: var(--accent); background: #e9f3ee; color: var(--accent); }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px 0;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: inherit;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.on, button.quiz.on {
+        border-color: var(--accent);
+        background: #e9f3ee;
+        color: var(--accent);
+        font-weight: 650;
+      }
+      button.quiz { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+      .dots { display: flex; gap: 6px; margin: 0 6px; }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--line);
+        cursor: pointer;
+      }
+      .dot.on { background: var(--accent); }
+      .spacer { flex: 1; }
+      .count { font-size: 12px; color: var(--muted); min-width: 64px; }
+      #problem, #caption {
+        margin: 10px 16px 0;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.55;
+        min-height: 50px;
+      }
+      #readout {
+        margin: 6px 16px 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+        min-height: 20px;
+      }
+      #readout b { color: var(--ink); }
+      #fit { padding: 12px 16px 16px; overflow: hidden; }
+      #stage {
+        display: flex;
+        gap: 26px;
+        align-items: flex-start;
+        transform-origin: top left;
+        width: max-content;
+      }
+      .panel {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px 12px;
+      }
+      .panel h2 { font-size: 13px; margin: 0 0 2px; }
+      .panel .sub { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
+      table { border-collapse: collapse; }
+
+      #A td, #A th {
+        width: 27px;
+        height: 24px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 10px;
+        border: 1px solid var(--line);
+      }
+      #A th { color: var(--muted); font-weight: 600; background: #f7fbf8; font-size: 9px; }
+      #A td { background: #fbfdfc; cursor: pointer; transition: background 0.35s; }
+      #A .band th { height: 20px; border: none; background: none; font-size: 10px; transition: color 0.3s; }
+      #A .band th span {
+        display: block;
+        margin: 0 2px;
+        padding: 2px 0;
+        border-radius: 5px;
+        border: 1px solid transparent;
+        transition: background 0.3s, border-color 0.3s;
+      }
+
+      #right { transition: opacity 0.5s; opacity: 0; }
+      #stage.show-lanes #right { opacity: 1; }
+      #R th, #R td {
+        height: 18px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 10px;
+        border: 1px solid var(--line);
+        padding: 0 4px;
+      }
+      #R th.lane {
+        width: 42px;
+        font-family: system-ui, sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        background: #f7fbf8;
+        cursor: pointer;
+        transition: background 0.35s;
+      }
+      #R th.vgpr, #R td.vgpr {
+        width: 64px;
+        opacity: 0;
+        transition: opacity 0.5s, background 0.35s;
+      }
+      #stage.show-vgprs #R th.vgpr,
+      #stage.show-vgprs #R td.vgpr { opacity: 1; }
+      #R td.vgpr { background: #fbfdfc; cursor: pointer; }
+      #R th.vgpr {
+        font-family: system-ui, sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        background: #f7fbf8;
+        white-space: nowrap;
+      }
+      #R tr.gstart th, #R tr.gstart td { border-top: 2px solid #b9cdc3; }
+      #R tr.band th {
+        height: 18px;
+        border: none;
+        background: none;
+        text-align: left;
+        font-family: system-ui, sans-serif;
+        font-size: 10px;
+        font-weight: 650;
+        color: transparent;
+        transition: color 0.3s;
+      }
+      #R tr.band th span {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 5px;
+        border: 1px solid transparent;
+        transition: background 0.3s, border-color 0.3s;
+      }
+      #R tr.band th.shown { color: var(--ink); }
+
+      .g0 { background: var(--g0) !important; }
+      .g1 { background: var(--g1) !important; }
+      .g2 { background: var(--g2) !important; }
+      .g3 { background: var(--g3) !important; }
+      .band .shown.g0 span, .band span.g0 { background: var(--g0); border-color: var(--g0s); }
+      .band .shown { color: var(--ink) !important; }
+      .band span.b0 { background: var(--g0); border-color: var(--g0s); }
+      .band span.b1 { background: var(--g1); border-color: var(--g1s); }
+      .band span.b2 { background: var(--g2); border-color: var(--g2s); }
+      .band span.b3 { background: var(--g3); border-color: var(--g3s); }
+      #A td.act0 { box-shadow: inset 0 0 0 1px var(--g0s); }
+      #A td.act1 { box-shadow: inset 0 0 0 1px var(--g1s); }
+      #A td.act2 { box-shadow: inset 0 0 0 1px var(--g2s); }
+      #A td.act3 { box-shadow: inset 0 0 0 1px var(--g3s); }
+      .sel {
+        box-shadow: inset 0 0 0 2px var(--accent) !important;
+        font-weight: 800;
+        color: #0b3d34;
+      }
+      .dim { opacity: 0.35; }
+
+      .fly {
+        position: fixed;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--mono);
+        font-size: 10px;
+        border-radius: 3px;
+        border: 1px solid;
+        pointer-events: none;
+        transition: transform 0.75s cubic-bezier(0.5, 0, 0.3, 1), width 0.75s, height 0.75s;
+      }
+      #hip {
+        margin: 8px 16px 16px;
+        padding: 10px 14px 12px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      #hip h2 { font-size: 13px; margin: 0 0 4px; }
+      #hip p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink); }
+      #hip p + p { margin-top: 4px; color: var(--muted); }
+      .hip-math {
+        margin-top: 8px;
+        padding: 8px 10px;
+        background: #f7fbf8;
+        border-radius: 8px;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+      }
+      .hip-math div.hit {
+        background: #e7f4ef;
+        margin: 0 -6px;
+        padding: 0 6px;
+        border-radius: 4px;
+        font-weight: 700;
+      }
+
+      .fly.g0 { border-color: var(--g0s); }
+      .fly.g1 { border-color: var(--g1s); }
+      .fly.g2 { border-color: var(--g2s); }
+      .fly.g3 { border-color: var(--g3s); }
+
+      .main { display: flex; gap: 16px; align-items: flex-start; padding-right: 16px; }
+      .main #fit { flex: 1; min-width: 0; }
+      #side { flex: none; width: 420px; padding-top: 12px; }
+      #side #caption, #side #readout, #side #hip { margin: 0 0 10px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>MFMA C · 16×16 f32</strong>
+      <small>Which lane and which VGPR hold each cell of the C tile.</small>
+      <button id="show-layout" class="quiz" type="button">Show layout</button>
+      <small id="layout-answer" hidden><code>layout_C_tv ((16,4),(4,1)):((16,4),(1,16))</code></small>
+      <nav class="switch">
+        <a href="mfma-a-layout-animation.html">A</a>
+        <a href="mfma-b-layout-animation.html">B</a>
+        <a class="on" href="mfma-c-layout-animation.html">C</a>
+        <a href="mfma-c32-layout.html">32×32 C</a>
+      </nav>
+    </header>
+
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <button id="play">▶ Play</button>
+      <button id="restart">Restart</button>
+      <div class="dots" id="dots"></div>
+      <span class="count" id="count"></span>
+      <span class="spacer"></span>
+      <span class="count">number in a cell</span>
+      <button id="num-col" class="on">m + 16·n</button>
+      <button id="num-row">16·m + n</button>
+    </div>
+
+    <p id="problem"><b>The problem.</b> One MFMA writes a 16×16 tile of C, the f32 accumulator: 16 rows of M by 16 columns of N, 256 values.</p>
+
+    <div class="main">
+    <div id="fit">
+      <div id="stage">
+        <section class="panel" id="left">
+          <h2>C tile · 16 × 16 f32</h2>
+          <p class="sub">rows are M, columns are N</p>
+          <table id="A"></table>
+        </section>
+        <section class="panel" id="right">
+          <h2>One wave · 64 lanes</h2>
+          <p class="sub" id="right-sub">each row is one lane (thread)</p>
+          <table id="R"></table>
+        </section>
+      </div>
+    </div>
+
+    <aside id="side">
+    <p id="caption"></p>
+    <p id="readout"></p>
+    <section id="hip">
+      <h2>HIP load and store · <code>load_C_16x16_col_major</code></h2>
+      <p><code>mfma_debug/01_simple_hgemm.cpp</code>. C is column-major, <code>ldc = m</code>. The launch is <code>gemm_test(16, 16, 32)</code>, so <code>ldc = 16</code>. The tile is <code>load_C_16x16_col_major(c + (cRow + cCol·ldc), ldc)</code> with <code>cRow = 0</code> and <code>cCol = 0</code>. The store writes the same addresses with <code>store_C_16x16_col_major</code>.</p>
+      <p>Each lane takes one column of N and four consecutive rows of M. In column-major those four f32 are adjacent, so the load is one <code>global_load_dwordx4</code> and the store is one <code>global_store_dwordx4</code>.</p>
+      <div class="hip-math" id="hip-math"></div>
+    </section>
+    </aside>
+    </div>
+
+    <script>
+      (() => {
+        const N = 16;
+        const LANES = 64;
+        const SLOT_LABEL = ["VGPR 0", "VGPR 1", "VGPR 2", "VGPR 3"];
+        const SLOT_ROW = ["VGPR 0", "VGPR 1", "VGPR 2", "VGPR 3"];
+
+        const $ = (id) => document.getElementById(id);
+        const stage = $("stage");
+        const fitEl = $("fit");
+
+        let order = "col";
+        const val = (m, n) => (order === "col" ? m + 16 * n : 16 * m + n);
+
+        const aCell = [];
+        const aBand = [];
+        const slotCell = [[], [], [], []];
+        const laneHead = [];
+        const rBand = [];
+
+        // ---- build C. Groups are four rows of M, not four columns. ----
+        {
+          const t = $("A");
+          const head = document.createElement("tr");
+          head.appendChild(document.createElement("th"));
+          for (let n = 0; n < N; n++) {
+            const th = document.createElement("th");
+            th.textContent = "N" + n;
+            head.appendChild(th);
+          }
+          t.appendChild(head);
+          for (let m = 0; m < N; m++) {
+            if (m % 4 === 0) {
+              const band = document.createElement("tr");
+              band.className = "band";
+              const th = document.createElement("th");
+              th.colSpan = 17;
+              th.innerHTML = `<span>M${m}–M${m + 3}</span>`;
+              band.appendChild(th);
+              t.appendChild(band);
+              aBand.push(th);
+            }
+            const tr = document.createElement("tr");
+            const th = document.createElement("th");
+            th.textContent = "M" + m;
+            tr.appendChild(th);
+            aCell.push([]);
+            for (let n = 0; n < N; n++) {
+              const td = document.createElement("td");
+              td.addEventListener("click", () => selectC(m, n));
+              tr.appendChild(td);
+              aCell[m].push(td);
+            }
+            t.appendChild(tr);
+          }
+        }
+
+        // ---- build lanes / VGPRs. Rows are lanes, columns are the four slots. ----
+        {
+          const t = $("R");
+          const head = document.createElement("tr");
+          const hl = document.createElement("th");
+          hl.className = "lane";
+          hl.textContent = "lane";
+          head.appendChild(hl);
+          for (let s = 0; s < 4; s++) {
+            const th = document.createElement("th");
+            th.className = "vgpr";
+            th.textContent = SLOT_ROW[s];
+            head.appendChild(th);
+          }
+          t.appendChild(head);
+
+          for (let l = 0; l < LANES; l++) {
+            if (l % 16 === 0) {
+              const band = document.createElement("tr");
+              band.className = "band";
+              const th = document.createElement("th");
+              th.colSpan = 5;
+              th.innerHTML = `<span>lanes ${l}–${l + 15} · M${l / 4}–M${l / 4 + 3}</span>`;
+              band.appendChild(th);
+              t.appendChild(band);
+              rBand.push(th);
+            }
+            const tr = document.createElement("tr");
+            if (l % 16 === 0) tr.className = "gstart";
+            const th = document.createElement("th");
+            th.className = "lane";
+            th.textContent = l;
+            th.addEventListener("click", () => selectLane(l));
+            tr.appendChild(th);
+            laneHead.push(th);
+            for (let s = 0; s < 4; s++) {
+              const td = document.createElement("td");
+              td.className = "vgpr";
+              td.addEventListener("click", () => selectSlot(s, l));
+              tr.appendChild(td);
+              slotCell[s].push(td);
+            }
+            t.appendChild(tr);
+          }
+        }
+
+        // ---- steps ----
+        const STEPS = [
+          {
+            lanes: false, vgprs: false, filled: -1, active: -1,
+            cap: () =>
+              (order === "col"
+                ? `Each cell shows <code>m + 16·n</code>. That is the number <code>layout_C_tv</code> returns.`
+                : `Each cell shows <code>16·m + n</code>, counting along the rows.`),
+          },
+          {
+            lanes: true, vgprs: false, filled: -1, active: -1,
+            cap: () =>
+              `<b>Who holds it.</b> One wave is <b>64 threads</b>, lanes 0–63, one lane per row. All 64 run the MFMA together, so between them they must hold all 256 values of C.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: -1, active: -1,
+            cap: () =>
+              `<b>Where it is held.</b> 256 values ÷ 64 lanes = <b>4 f32 per lane</b>. The accumulator is f32, so each value is a whole VGPR. Each lane uses <b>4 VGPRs</b>.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 0, active: 0,
+            cap: () =>
+              `<b>Rows M0–M3 → lanes 0–15.</b> Lane n takes column n. Its four VGPRs are those four rows: M0 → VGPR 0, M1 → VGPR 1, M2 → VGPR 2, M3 → VGPR 3.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 1, active: 1,
+            cap: () =>
+              `<b>Rows M4–M7 → lanes 16–31.</b> Same columns, next four rows. Lane 16 holds column N0 again.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 2, active: 2,
+            cap: () => `<b>Rows M8–M11 → lanes 32–47.</b> Lane 32 + n holds column n, rows 8 to 11.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 3, active: 3,
+            cap: () =>
+              `<b>Rows M12–M15 → lanes 48–63.</b> Every cell of C now sits in exactly one lane and one VGPR.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 3, active: -1,
+            cap: () =>
+              `<b>Lane = <code>n + 16·(m÷4)</code>, VGPR = <code>m mod 4</code>.</b> ` +
+              (layoutShown ? `That is <code>layout_C_tv = ((16,4),(4,1)):((16,4),(1,16))</code>. The value coordinate is <code>(m mod 4, 0)</code>, and it returns <code>16·n + 4·(m÷4) + (m mod 4) = m + 16·n</code>. ` : ``) +
+              `Click any cell, VGPR, or lane number.`,
+          },
+        ];
+
+        let layoutShown = false;
+        let lastPick = null;
+        let step = 0;
+        let filled = -1;
+        let flyToken = 0;
+        let playing = false;
+        let playTimer = null;
+
+        // dots
+        const dotsEl = $("dots");
+        STEPS.forEach((_, i) => {
+          const d = document.createElement("span");
+          d.className = "dot";
+          d.title = "step " + (i + 1);
+          d.addEventListener("click", () => { stopPlay(); go(i, false); });
+          dotsEl.appendChild(d);
+        });
+
+        function cancelFlights() {
+          flyToken++;
+          document.querySelectorAll(".fly").forEach((d) => d.remove());
+        }
+
+        function fillOne(n, s, g) {
+          const m = 4 * g + s;
+          const lane = n + 16 * g;
+          const td = slotCell[s][lane];
+          td.textContent = val(m, n);
+          td.className = "vgpr g" + g;
+        }
+
+        function fillGroup(g) {
+          for (let n = 0; n < N; n++) for (let s = 0; s < 4; s++) fillOne(n, s, g);
+          for (let l = 16 * g; l < 16 * g + 16; l++) laneHead[l].classList.add("g" + g);
+          rBand[g].classList.add("shown");
+          rBand[g].querySelector("span").className = "b" + g;
+        }
+
+        function clearRight() {
+          for (let s = 0; s < 4; s++)
+            for (let l = 0; l < LANES; l++) {
+              slotCell[s][l].textContent = "";
+              slotCell[s][l].className = "vgpr";
+            }
+          laneHead.forEach((th) => (th.className = "lane"));
+          rBand.forEach((th) => {
+            th.classList.remove("shown");
+            th.querySelector("span").className = "";
+          });
+        }
+
+        function paintA(upTo, active) {
+          for (let m = 0; m < N; m++)
+            for (let n = 0; n < N; n++) {
+              const g = m >> 2;
+              const td = aCell[m][n];
+              td.textContent = val(m, n);
+              td.className = "";
+              if (g <= upTo || g === active) td.classList.add("g" + g);
+              if (g === active) td.classList.add("act" + g);
+            }
+          aBand.forEach((th, g) => {
+            const sp = th.querySelector("span");
+            sp.className = g <= upTo || g === active ? "b" + g : "";
+            sp.textContent =
+              g === active ? `M${4 * g}–M${4 * g + 3} → lanes ${16 * g}–${16 * g + 15}` : `M${4 * g}–M${4 * g + 3}`;
+          });
+        }
+
+        function fly(g) {
+          const token = flyToken;
+          let pending = 0;
+          for (let n = 0; n < N; n++)
+            for (let s = 0; s < 4; s++) {
+              const m = 4 * g + s;
+              const lane = n + 16 * g;
+              const src = aCell[m][n].getBoundingClientRect();
+              const dst = slotCell[s][lane].getBoundingClientRect();
+              const d = document.createElement("div");
+              d.className = "fly g" + g;
+              d.textContent = val(m, n);
+              Object.assign(d.style, {
+                left: src.left + "px",
+                top: src.top + "px",
+                width: src.width + "px",
+                height: src.height + "px",
+              });
+              document.body.appendChild(d);
+              pending++;
+              const delay = n * 45 + s * 170;
+              setTimeout(() => {
+                if (token !== flyToken) return;
+                d.style.transform = `translate(${dst.left - src.left}px, ${dst.top - src.top}px)`;
+                d.style.width = dst.width + "px";
+                d.style.height = dst.height + "px";
+              }, delay + 30);
+              setTimeout(() => {
+                if (token !== flyToken) return;
+                d.remove();
+                fillOne(n, s, g);
+                if (--pending === 0) {
+                  fillGroup(g);
+                  filled = g;
+                }
+              }, delay + 30 + 780);
+            }
+          for (let l = 16 * g; l < 16 * g + 16; l++) laneHead[l].classList.add("g" + g);
+          rBand[g].classList.add("shown");
+          rBand[g].querySelector("span").className = "b" + g;
+        }
+
+        const LDC = 16;
+        const HIP_FORMULA =
+          "m0 = (threadIdx.x / 16) * 4\n" +
+          "n  = threadIdx.x % 16\n" +
+          "v[s] = c[(m0 + s) + n * ldc]    // s = 0, 1, 2, 3, and these four addresses are consecutive";
+
+        function renderHipFormula() {
+          $("hip-math").textContent = HIP_FORMULA;
+        }
+
+        function renderHipLane(lane, slot) {
+          const n = lane % 16;
+          const m0 = (lane >> 4) * 4;
+          const base = m0 + n * LDC;
+          const lines = [
+            `<div>lane ${lane}   threadIdx.x = ${lane}   m0 = ${m0}   n = ${n}   ldc = ${LDC}</div>`,
+            `<div>one global_load_dwordx4 at c[${base}], and the store writes c[${base}] through c[${base + 3}]</div>`,
+          ];
+          for (let s = 0; s < 4; s++) {
+            const m = m0 + s;
+            const addr = m + n * LDC;
+            const mark = s === slot ? "hit" : "";
+            lines.push(
+              `<div class="${mark}">v[${s}]  C[${m}][${n}]  c[${m} + ${n}*16] = ${addr}   ${SLOT_LABEL[s]}</div>`
+            );
+          }
+          $("hip-math").innerHTML = lines.join("");
+        }
+
+        function hipForStep(st) {
+          const g = st.active >= 0 ? st.active : st.filled;
+          if (g < 0) renderHipFormula();
+          else renderHipLane(16 * g, -1);
+        }
+
+        function go(i, animate) {
+          cancelFlights();
+          clearSel();
+          lastPick = null;
+          step = Math.max(0, Math.min(STEPS.length - 1, i));
+          const st = STEPS[step];
+          stage.classList.toggle("show-lanes", st.lanes);
+          stage.classList.toggle("show-vgprs", st.vgprs);
+          $("right-sub").textContent = st.vgprs
+            ? "each row is one lane · columns are its 4 f32 VGPRs"
+            : "each row is one lane (thread)";
+
+          const animGroup = animate && st.active >= 0 ? st.active : -1;
+          const upTo = animGroup >= 0 ? animGroup - 1 : st.filled;
+          clearRight();
+          for (let g = 0; g <= upTo; g++) fillGroup(g);
+          filled = upTo;
+          paintA(upTo, st.active);
+          if (animGroup >= 0) requestAnimationFrame(() => fly(animGroup));
+
+          $("caption").innerHTML = st.cap();
+          $("readout").innerHTML =
+            st.filled >= 0 ? "Click a cell of C, a VGPR, or a lane number." : "";
+          [...dotsEl.children].forEach((d, j) => d.classList.toggle("on", j === step));
+          $("count").textContent = `step ${step + 1} / ${STEPS.length}`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === STEPS.length - 1;
+          hipForStep(st);
+        }
+
+        // ---- selection ----
+        function clearSel() {
+          document.querySelectorAll(".sel").forEach((e) => e.classList.remove("sel"));
+          document.querySelectorAll(".dim").forEach((e) => e.classList.remove("dim"));
+        }
+
+        function selectC(m, n) {
+          const g = m >> 2;
+          if (g > filled) return;
+          lastPick = () => selectC(m, n);
+          clearSel();
+          const s = m & 3;
+          const lane = n + 16 * g;
+          aCell[m][n].classList.add("sel");
+          slotCell[s][lane].classList.add("sel");
+          laneHead[lane].classList.add("sel");
+          $("readout").innerHTML =
+            `<b>C[${m}][${n}]</b> holds <b>${val(m, n)}</b>. ` +
+            `Lane = n + 16·(m÷4) = ${n} + 16·${g} = <b>${lane}</b>. ` +
+            `VGPR = m mod 4 = ${s} → <b>${SLOT_LABEL[s]}</b>. ` +
+            (layoutShown ? `<code>layout_C_tv((${n}, ${g}), (${s}, 0))</code> = 16·${n} + 4·${g} + ${s} = <b>${m + 16 * n}</b>. ` : ``) +
+            `HIP <code>c[m + n·ldc]</code> = ${m} + ${n}·16 = <b>${m + n * LDC}</b>.`;
+          renderHipLane(lane, s);
+        }
+
+        function selectSlot(s, lane) {
+          const g = lane >> 4;
+          if (g > filled) return;
+          selectC(4 * g + s, lane % 16);
+        }
+
+        function selectLane(lane) {
+          const g = lane >> 4;
+          if (g > filled) return;
+          lastPick = () => selectLane(lane);
+          clearSel();
+          const n = lane % 16;
+          laneHead[lane].classList.add("sel");
+          const vals = [];
+          for (let s = 0; s < 4; s++) {
+            aCell[4 * g + s][n].classList.add("sel");
+            slotCell[s][lane].classList.add("sel");
+            vals.push(val(4 * g + s, n));
+          }
+          $("readout").innerHTML =
+            `<b>Lane ${lane}</b> = thread <code>(t0, t1) = (${n}, ${g})</code> holds column <b>N${n}</b>, rows <b>M${4 * g}–M${4 * g + 3}</b>: ` +
+            `VGPR 0 = ${vals[0]}, VGPR 1 = ${vals[1]}, VGPR 2 = ${vals[2]}, VGPR 3 = ${vals[3]}. ` +
+            `HIP addresses ${4 * g + n * LDC} through ${4 * g + n * LDC + 3}.`;
+          renderHipLane(lane, -1);
+        }
+
+        // ---- controls ----
+        function stopPlay() {
+          playing = false;
+          clearTimeout(playTimer);
+          $("play").textContent = "▶ Play";
+          $("play").classList.remove("on");
+        }
+
+        function playTick() {
+          if (!playing) return;
+          if (step >= STEPS.length - 1) { stopPlay(); return; }
+          go(step + 1, true);
+          const wait = STEPS[step].active >= 0 ? 3300 : 2600;
+          playTimer = setTimeout(playTick, wait);
+        }
+
+        $("next").addEventListener("click", () => { stopPlay(); go(step + 1, true); });
+        $("prev").addEventListener("click", () => { stopPlay(); go(step - 1, false); });
+        $("restart").addEventListener("click", () => { stopPlay(); go(0, false); });
+        $("play").addEventListener("click", () => {
+          if (playing) { stopPlay(); return; }
+          playing = true;
+          $("play").textContent = "❚❚ Pause";
+          $("play").classList.add("on");
+          if (step >= STEPS.length - 1) go(0, false);
+          playTimer = setTimeout(playTick, 900);
+        });
+
+        function setOrder(o) {
+          order = o;
+          $("num-col").classList.toggle("on", o === "col");
+          $("num-row").classList.toggle("on", o === "row");
+          go(step, false);
+        }
+        $("show-layout").addEventListener("click", () => {
+          layoutShown = !layoutShown;
+          $("layout-answer").hidden = !layoutShown;
+          $("show-layout").textContent = layoutShown ? "Hide layout" : "Show layout";
+          $("show-layout").classList.toggle("on", layoutShown);
+          $("caption").innerHTML = STEPS[step].cap();
+          if (lastPick) lastPick();
+        });
+        $("num-col").addEventListener("click", () => setOrder("col"));
+        $("num-row").addEventListener("click", () => setOrder("row"));
+
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") { stopPlay(); go(step + 1, true); }
+          else if (e.key === "ArrowLeft") { stopPlay(); go(step - 1, false); }
+          else if (e.key === " ") { e.preventDefault(); $("play").click(); }
+        });
+
+        // ---- fit to width ----
+        function fit() {
+          cancelFlights();
+          stage.style.transform = "none";
+          const w = stage.scrollWidth;
+          const h = stage.scrollHeight;
+          const avail = fitEl.clientWidth - 32;
+          const s = Math.min(1, avail / w);
+          stage.style.transform = `scale(${s})`;
+          fitEl.style.height = h * s + 28 + "px";
+        }
+        window.addEventListener("resize", () => { fit(); go(step, false); });
+
+        go(0, false);
+        fit();
+      })();
+    </script>
+  </body>
+</html>

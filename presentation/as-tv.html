@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>make_layout_tv</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --a: #11695a;
+        --b: #3c7bbf;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body { margin: 0; }
+      a { color: var(--accent); text-decoration: none; }
+      header {
+        padding: 14px 28px; background: white; border-bottom: 1px solid var(--line);
+        display: flex; gap: 16px; align-items: baseline;
+      }
+      header strong { font-size: 18px; }
+      header small { color: var(--muted); font-size: 14px; }
+      .bar { display: flex; align-items: center; gap: 8px; padding: 14px 28px 0; }
+      button {
+        font: inherit; font-size: 15px; color: inherit; background: white;
+        border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      .count { font-size: 14px; color: var(--muted); margin-left: 8px; }
+      #goal {
+        margin-left: 18px; font: 700 16px var(--mono); padding: 6px 12px;
+        border: 1px solid var(--accent); border-radius: 8px; background: white;
+      }
+      #caption { margin: 14px 28px 0; font-size: 23px; line-height: 1.35; min-height: 60px; max-width: 1150px; }
+      .panel { margin: 8px 28px 28px; }
+      .flow { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+      .inputs { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+      .arrow { text-align: center; min-width: 210px; }
+      .arrow .call { font: 700 16px var(--mono); color: var(--accent); white-space: pre; }
+      .arrow .glyph { font-size: 40px; line-height: 1; color: var(--accent); }
+      .card { background: white; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 12px; }
+      .card .k { font-size: 13px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+      .card .v { font: 700 15px var(--mono); margin: 3px 0 4px; }
+      .card .n { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+      .card.out { border: 2px solid var(--accent); }
+      .card.a { border-color: var(--a); }
+      .card.a .k { color: var(--a); }
+      .card.b { border-color: var(--b); }
+      .card.b .k { color: var(--b); }
+      table.g { border-collapse: separate; border-spacing: 3px; }
+      table.g th { font: 11px var(--mono); color: var(--muted); font-weight: 500; }
+      table.g td {
+        width: 34px; min-width: 34px; height: 30px; text-align: center; border-radius: 6px;
+        border: 1px solid #203b4022; font: 700 13px var(--mono); cursor: pointer;
+      }
+      table.tile td { width: 42px; min-width: 42px; height: 38px; }
+      table.tile td.tt { border-top: 2px solid var(--ink); }
+      table.tile td.tb { border-bottom: 2px solid var(--ink); }
+      table.tile td.tl { border-left: 2px solid var(--ink); }
+      table.tile td.tr { border-right: 2px solid var(--ink); }
+      td.sel { box-shadow: inset 0 0 0 3px #111; position: relative; z-index: 1; }
+      .windows { display: grid; grid-template-columns: repeat(4, max-content); gap: 5px; }
+      .win { border: 2px solid var(--ink); border-radius: 8px; padding: 2px; }
+      .win.on { box-shadow: 0 0 0 2px var(--accent); }
+      .windows td { width: 28px; min-width: 28px; height: 26px; font-size: 12px; }
+      .b-cell { background: #e3edf8; }
+      .plain { background: #f1f5f3; }
+      #calc-card { margin-top: 14px; display: inline-block; }
+      #calc { font: 600 16px var(--mono); line-height: 1.7; white-space: pre; }
+      #calc .ca { color: var(--a); }
+      #calc .cb { color: var(--b); }
+      #calc .res { font-weight: 800; }
+      #recap {
+        margin: 0; padding: 22px 26px; background: white; border: 1px solid var(--line);
+        border-radius: 14px; font: 650 22px var(--mono); line-height: 1.85; display: inline-block;
+      }
+      #recap .cm { color: var(--muted); font-weight: 500; }
+      #recap .fn { color: var(--accent); }
+      #recap .num { color: #c47b2b; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="index.html">Tile abstraction</a>
+      <strong>make_layout_tv</strong>
+      <small>three transforms, then the four calls</small>
+    </header>
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <span class="count" id="count"></span>
+      <span id="goal">goal: layout_tv(thread, value) = offset in the tile</span>
+    </div>
+    <p id="caption"></p>
+    <section class="panel">
+      <pre id="recap" hidden></pre>
+      <div class="flow" id="flow"></div>
+      <div class="card" id="calc-card">
+        <div class="k">selected cell</div>
+        <div id="calc"></div>
+      </div>
+    </section>
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        const color = (t) => {
+          const hue = [199, 32, 155, 274, 350, 64, 220, 174][t % 8];
+          return `hsl(${hue} 46% ${t < 8 ? 86 : 74}%)`;
+        };
+        const at = (t, v) => {
+          const tm = t >> 2, tn = t & 3, vm = v & 1, vn = v >> 1;
+          const r = vm + 2 * tm, c = vn + 2 * tn;
+          return { t, v, tm, tn, vm, vn, r, c, n: t + 16 * v, off: r + 8 * c };
+        };
+        const fromTile = (r, c) => at(4 * (r >> 1) + (c >> 1), (r & 1) + 2 * (c & 1));
+
+        function table(rows, cols, td, cls = "", rowHead = (i) => i, colHead = (j) => j) {
+          let h = `<table class="g ${cls}"><tr><th></th>` + [...Array(cols).keys()].map((j) => `<th>${colHead(j)}</th>`).join("") + "</tr>";
+          for (let i = 0; i < rows; i++)
+            h += `<tr><th>${rowHead(i)}</th>` + [...Array(cols).keys()].map((j) => td(i, j)).join("") + "</tr>";
+          return h + "</table>";
+        }
+        const cell = (x, text, sel, extra = "", bg = color(x.t)) =>
+          `<td class="${extra} ${sel ? "sel" : ""}" data-t="${x.t}" data-v="${x.v}" style="background:${bg}">${text}</td>`;
+        const card = (k, v, note, body, cls = "") =>
+          `<div class="card ${cls}"><div class="k">${k}</div><div class="v">${v}</div>${note ? `<div class="n">${note}</div>` : ""}${body}</div>`;
+        const arrow = (call) => `<div class="arrow"><div class="call">${call}</div><div class="glyph">⟶</div></div>`;
+
+        const gridA = (p) => card("A · thread", "(4,4):(4,1)", "number = thread", table(4, 4, (i, j) => {
+          const x = at(4 * i + j, p.v);
+          return cell(x, x.t, x.t === p.t);
+        }), "a");
+        const gridB = (p) => card("B · value", "(2,2):(1,2)", "number = value", table(2, 2, (i, j) => {
+          const x = at(p.t, i + 2 * j);
+          return cell(x, x.v, x.v === p.v, "b-cell", "");
+        }), "b");
+        const gridP = (p, out) => card("P = raked_product(A, B)", "((2,4),(2,4)):((16,4),(32,1))",
+          "in: tile (row, col) · out: n = thread + 16 × value",
+          table(8, 8, (r, c) => {
+            const x = fromTile(r, c);
+            return cell(x, x.n, x.t === p.t && x.v === p.v, [r % 2 ? "tb" : "tt", c % 2 ? "tr" : "tl"].join(" "));
+          }, "tile"), out ? "out" : "");
+        const gridInv = (p, out) => {
+          const a = p.n % 4, b = (p.n >> 2) % 4;
+          let wins = "";
+          for (let c0 = 0; c0 < 4; c0++) {
+            for (let c1 = 0; c1 < 4; c1++) {
+              let rows = "";
+              for (let c2 = 0; c2 < 2; c2++) {
+                let tds = "";
+                for (let c3 = 0; c3 < 2; c3++) {
+                  const n = c0 + 4 * c1 + 16 * c2 + 32 * c3;
+                  const x = at(n % 16, n >> 4);
+                  tds += cell(x, x.off, x.t === p.t && x.v === p.v);
+                }
+                rows += `<tr>${tds}</tr>`;
+              }
+              wins += `<div class="win${c0 === a && c1 === b ? " on" : ""}"><table class="g">${rows}</table></div>`;
+            }
+          }
+          return card("Pinv = right_inverse(P)", "(4,4,2,2):(16,2,1,8)",
+            "4×4 windows of 2×2. The number is the offset.",
+            `<div class="windows">${wins}</div>`, out ? "out" : "");
+        };
+        const gridPacked = (p) => card("packed", "(16,4):(1,16)", "in: (thread, value) · out: n = thread + 16 × value",
+          table(4, 16, (i, j) => {
+            const x = at(j, i);
+            return cell(x, x.n, x.t === p.t && x.v === p.v, "plain", "");
+          }, "", (i) => `v${i}`, (j) => `t${j}`));
+        const gridTV = (p) => card("layout_tv = composition(Pinv, packed)", "((4,4),(2,2)):((16,2),(1,8))",
+          "in: (thread, value) · out: offset = row + 8 × col",
+          table(4, 16, (i, j) => {
+            const x = at(j, i);
+            return cell(x, x.off, x.t === p.t && x.v === p.v);
+          }, "", (i) => `v${i}`, (j) => `t${j}`), "out");
+
+        const FRAMES = [
+          {
+            cap: "Step 1. A and B go into raked_product. Each tile cell gets n = thread + 16 × value, the colex coordinate of (thread, value). Color is the thread.",
+            flow: (p) => `<div class="inputs">${gridA(p)}${gridB(p)}</div>${arrow("fx.raked_product(A, B)")}${gridP(p, true)}`,
+            calc: (p) => [
+              `tile (${p.r}, ${p.c})`,
+              `<span class="ca">A(${p.tm}, ${p.tn}) = ${p.t}</span> thread   <span class="cb">B(${p.vm}, ${p.vn}) = ${p.v}</span> value`,
+              `P = <span class="cb">16·${p.vm}</span> + <span class="ca">4·${p.tm}</span> + <span class="cb">32·${p.vn}</span> + <span class="ca">1·${p.tn}</span>`,
+              `  = <span class="ca">${p.t}</span> + 16 × <span class="cb">${p.v}</span> = <span class="res">${p.n}</span>`,
+            ],
+          },
+          {
+            cap: "Step 2. right_inverse flips P. The shape (4,4,2,2) is a 4×4 of 2×2 windows. The window is the first two modes, the 2×2 is the last two. The number in each cell is the offset.",
+            flow: (p) => `${gridP(p, false)}${arrow("fx.right_inverse(P)")}${gridInv(p, true)}`,
+            calc: (p) => {
+              const a = p.n % 4, b = (p.n >> 2) % 4, c = (p.n >> 4) % 2, d = p.n >> 5;
+              return [
+                `P(tile ${p.r}, ${p.c}) = <span class="res">${p.n}</span>`,
+                `${p.n} sits in window (${a}, ${b}), inside (${c}, ${d})`,
+                `Pinv = 16·${a} + 2·${b} + 1·${c} + 8·${d} = <span class="res">${p.off}</span>`,
+                `${p.off} = ${p.r} + 8 × ${p.c}   row ${p.r}, col ${p.c}`,
+              ];
+            },
+          },
+          {
+            cap: "Step 3. packed takes (thread, value) to n. Pinv takes n to the offset. composition(Pinv, packed) chains them: (thread, value) in, offset out — the goal.",
+            flow: (p) => `<div class="inputs">${gridInv(p, false)}${gridPacked(p)}</div>${arrow("fx.composition(Pinv, packed)")}${gridTV(p)}`,
+            calc: (p) => [
+              `packed(<span class="ca">${p.t}</span>, <span class="cb">${p.v}</span>) = ${p.t} + 16 × ${p.v} = ${p.n}`,
+              `Pinv at n = ${p.n} gives <span class="res">${p.off}</span>`,
+              `layout_tv(<span class="ca">${p.t}</span>, <span class="cb">${p.v}</span>)`,
+              `  thread ${p.t} = (${p.t % 4}, ${p.t >> 2})   value ${p.v} = (${p.v % 2}, ${p.v >> 1})`,
+              `  = 16·${p.t % 4} + 2·${p.t >> 2} + 1·${p.v % 2} + 8·${p.v >> 1} = <span class="res">${p.off}</span>`,
+            ],
+          },
+          {
+            cap: "A is (4,4):(4,1) and B is (2,2):(1,2). These four calls are the whole construction. The comment on each line is the layout that call prints.",
+            code: [
+              "P = fx.raked_product(A, B)                  # ((2,4),(2,4)):((16,4),(32,1))",
+              "Pinv = fx.right_inverse(P)                 # (4,4,2,2):(16,2,1,8)",
+              "packed = fx.make_layout((16, 4), (1, 16))  # (16,4):(1,16)",
+              "layout_tv = fx.composition(Pinv, packed)   # ((4,4),(2,2)):((16,2),(1,8))",
+            ],
+          },
+        ];
+
+        let step = 0;
+        let pick = at(4, 2);
+
+        const hi = (line) => {
+          const hash = line.indexOf("#");
+          const body = hash < 0 ? line : line.slice(0, hash);
+          const comment = hash < 0 ? "" : line.slice(hash);
+          let html = "";
+          for (const m of body.matchAll(/\d+|[A-Za-z_]\w*|./g)) {
+            const tok = m[0];
+            const cls = /^\d+$/.test(tok) ? "num" : /^[A-Za-z_]/.test(tok) && body[m.index + tok.length] === "(" ? "fn" : "";
+            html += cls ? `<span class="${cls}">${tok}</span>` : tok;
+          }
+          return html + (comment ? `<span class="cm">${comment}</span>` : "");
+        };
+
+        function render() {
+          const f = FRAMES[step];
+          $("caption").textContent = f.cap;
+          $("recap").hidden = !f.code;
+          $("flow").hidden = !!f.code;
+          $("calc-card").hidden = !!f.code;
+          if (f.code) $("recap").innerHTML = f.code.map(hi).join("\n");
+          else {
+            $("flow").innerHTML = f.flow(pick);
+            $("calc").innerHTML = f.calc(pick).join("\n");
+          }
+          $("count").textContent = `${step + 1} / ${FRAMES.length}`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === FRAMES.length - 1;
+        }
+
+        $("flow").addEventListener("click", (e) => {
+          const td = e.target.closest("td[data-t]");
+          if (!td) return;
+          pick = at(Number(td.dataset.t), Number(td.dataset.v));
+          render();
+        });
+        const go = (d) => { step = Math.max(0, Math.min(FRAMES.length - 1, step + d)); render(); };
+        $("next").addEventListener("click", () => go(1));
+        $("prev").addEventListener("click", () => go(-1));
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") go(1);
+          else if (e.key === "ArrowLeft") go(-1);
+        });
+        render();
+      })();
+    </script>
+  </body>
+</html>

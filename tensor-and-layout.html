@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tensor · pointer and layout</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --ptr: #3c7bbf;
+        --ptrbg: #e7f1fb;
+        --lay: #c47b2b;
+        --laybg: #fbf1e3;
+        --hitbg: #e9f3ee;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body { margin: 0; }
+      code { font-family: var(--mono); }
+      header {
+        padding: 14px 28px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+      }
+      header strong { font-size: 18px; }
+      header small { color: var(--muted); font-size: 14px; }
+      .bar { display: flex; align-items: center; gap: 8px; padding: 14px 28px 0; }
+      button {
+        font: inherit; font-size: 15px; color: inherit; background: white;
+        border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      .count { font-size: 14px; color: var(--muted); margin-left: 8px; }
+      #caption {
+        margin: 16px 28px 0;
+        font-size: 26px;
+        line-height: 1.35;
+        min-height: 72px;
+      }
+      .panel { margin: 18px 28px 28px; }
+      .tensor {
+        display: flex;
+        border: 3px solid var(--ink);
+        border-radius: 16px;
+        overflow: hidden;
+        width: max-content;
+      }
+      .part { padding: 22px 28px; min-width: 260px; background: white; }
+      .part .k { font-size: 13px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; }
+      .part .v { font: 700 28px var(--mono); margin-top: 6px; }
+      .part.lay { border-left: 3px solid var(--ink); }
+      .part.on.ptr { background: var(--ptrbg); }
+      .part.on.lay { background: var(--laybg); }
+      .part.ptr .k { color: var(--ptr); }
+      .part.lay .k { color: var(--lay); }
+      #lay-def { display: flex; gap: 22px; margin-top: 8px; }
+      #lay-def span {
+        display: block;
+        font-size: 13px;
+        font-weight: 750;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--lay);
+      }
+      #lay-def b { display: block; font: 700 28px var(--mono); margin-top: 4px; font-weight: 700; }
+      #path {
+        margin-top: 22px;
+        font: 700 32px var(--mono);
+        line-height: 1.35;
+        min-height: 92px;
+      }
+      #path .acc { color: var(--accent); }
+      #path .off { color: var(--lay); }
+      #path .addr { color: var(--ptr); }
+      table.g { border-collapse: separate; border-spacing: 0; margin-top: 18px; }
+      table.g th { font: 14px var(--mono); color: var(--muted); padding: 4px 6px; }
+      table.g td {
+        width: 64px; height: 52px; text-align: center;
+        border: 1px solid var(--line);
+        font: 700 22px var(--mono); background: white;
+      }
+      table.g td.hit { background: var(--hitbg); outline: 3px solid var(--accent); outline-offset: -3px; }
+      table.g td.dim { color: #c5d4ce; }
+      #rest { margin-top: 28px; display: flex; gap: 28px; flex-wrap: wrap; }
+      #rest section { min-width: 280px; }
+      #rest h2 { font-size: 15px; margin: 0 0 8px; color: var(--muted); font-weight: 700; }
+      #rest code { display: block; font-size: 18px; line-height: 1.7; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>A tensor</strong>
+      <small>pointer + layout</small>
+    </header>
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <span class="count" id="count"></span>
+    </div>
+    <p id="caption"></p>
+    <section class="panel">
+      <div class="tensor">
+        <div class="part ptr" id="p-ptr">
+          <div class="k">pointer</div>
+          <div class="v" id="ptr-v">A</div>
+        </div>
+        <div class="part lay" id="p-lay">
+          <div class="k">layout</div>
+          <div class="v" id="lay-v">(3,4):(4,1)</div>
+          <div id="lay-def" hidden>
+            <div><span>shape</span><b>(3, 4)</b></div>
+            <div><span>stride</span><b>(4, 1)</b></div>
+          </div>
+        </div>
+      </div>
+      <div id="path"></div>
+      <table class="g" id="grid" hidden></table>
+      <div id="rest" hidden>
+        <section>
+          <h2>use the layout already there</h2>
+          <code>tensor[coord]</code>
+          <code>load / store / fill</code>
+          <code>copy · gemm</code>
+        </section>
+        <section>
+          <h2>return a new layout</h2>
+          <code>slice</code>
+          <code>zipped_divide</code>
+          <code>partition_S · retile</code>
+          <code>make_fragment_A/B/C</code>
+        </section>
+        <section>
+          <h2>same layout</h2>
+          <code>make_buffer_tensor</code>
+        </section>
+      </div>
+    </section>
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        const FRAMES = [
+          {
+            cap: "A tensor is a pointer plus a layout.",
+            path: "",
+            grid: "hide",
+          },
+          {
+            cap: "The pointer is where the data starts.",
+            ptr: true,
+            path: "",
+            grid: "hide",
+          },
+          {
+            cap: "A layout is a shape and a stride. For (1, 2) the offset is 1·4 + 2·1.",
+            lay: true,
+            def: true,
+            path: "offset  =  Σ coord × stride<br>1·4 + 2·1  =  <span class='off'>6</span>",
+            grid: "hit",
+          },
+          {
+            cap: "The layout turns a coordinate into an offset.",
+            lay: true,
+            path: "4·i + j",
+            grid: "all",
+          },
+          {
+            cap: "tensor[1, 2] names a coordinate.",
+            path: "<span class='acc'>tensor[1, 2]</span>",
+            grid: "all",
+          },
+          {
+            cap: "The coordinate goes through the layout.",
+            lay: true,
+            path: "<span class='acc'>[1, 2]</span>  →  <span class='off'>6</span>",
+            grid: "hit",
+          },
+          {
+            cap: "Then the pointer. The address is A + 6.",
+            ptr: true,
+            lay: true,
+            ptrV: "A + 6",
+            path: "<span class='addr'>A + 6</span>",
+            grid: "hit",
+          },
+          {
+            cap: "A store uses that same address.",
+            ptr: true,
+            lay: true,
+            ptrV: "A + 6",
+            path: "<span class='acc'>tensor[1, 2] = value</span>",
+            grid: "hit",
+          },
+          {
+            cap: "Other calls either use this path, or hand back a tensor with a new layout.",
+            path: "",
+            grid: "hide",
+            rest: true,
+          },
+        ];
+
+        const grid = $("grid");
+        const head = document.createElement("tr");
+        head.innerHTML = "<th></th>" + [0, 1, 2, 3].map((j) => `<th>${j}</th>`).join("");
+        grid.appendChild(head);
+        for (let i = 0; i < 3; i++) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<th>${i}</th>` + [0, 1, 2, 3].map((j) => `<td data-i="${i}" data-j="${j}">${4 * i + j}</td>`).join("");
+          grid.appendChild(tr);
+        }
+
+        let step = 0;
+        function show() {
+          const f = FRAMES[step];
+          $("caption").textContent = f.cap;
+          $("p-ptr").classList.toggle("on", !!f.ptr);
+          $("p-lay").classList.toggle("on", !!f.lay);
+          $("ptr-v").textContent = f.ptrV || "A";
+          $("lay-v").hidden = !!f.def;
+          $("lay-def").hidden = !f.def;
+          $("path").innerHTML = f.path;
+          grid.hidden = f.grid === "hide";
+          grid.querySelectorAll("td").forEach((td) => {
+            const hit = f.grid === "hit" && td.dataset.i === "1" && td.dataset.j === "2";
+            td.classList.toggle("hit", hit);
+            td.classList.toggle("dim", f.grid === "hit" && !hit);
+          });
+          $("rest").hidden = !f.rest;
+          $("count").textContent = `${step + 1} / ${FRAMES.length}`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === FRAMES.length - 1;
+        }
+        const go = (d) => { step = Math.max(0, Math.min(FRAMES.length - 1, step + d)); show(); };
+        $("next").addEventListener("click", () => go(1));
+        $("prev").addEventListener("click", () => go(-1));
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") go(1);
+          else if (e.key === "ArrowLeft") go(-1);
+        });
+        show();
+      })();
+    </script>
+  </body>
+</html>

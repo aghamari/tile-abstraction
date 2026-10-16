@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How a layout works · shape and stride</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --g0: #cfe3f7;
+        --g0s: #3c7bbf;
+        --g1: #f6dcc0;
+        --g1s: #c47b2b;
+        --g2: #cfeedd;
+        --g2s: #2f8a5c;
+        --g3: #e6d6f2;
+        --g3s: #7d4fae;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      code { font-family: var(--mono); }
+      header {
+        padding: 10px 16px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      header strong { font-size: 15px; }
+      header small { color: var(--muted); font-size: 12px; }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px 0;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: inherit;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      .spacer { flex: 1; }
+      .count { font-size: 12px; color: var(--muted); min-width: 64px; }
+      .cases { display: flex; gap: 6px; flex-wrap: wrap; }
+      .cases button { font-family: var(--mono); font-size: 12px; }
+      #caption {
+        margin: 10px 16px 0;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.6;
+        min-height: 54px;
+      }
+      .panel {
+        margin: 12px 16px 16px;
+        padding: 16px 18px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      #lay {
+        font: 700 30px var(--mono);
+        letter-spacing: 0.5px;
+      }
+      #lay .tok { padding: 0 2px; border-radius: 5px; transition: background 0.25s, color 0.25s; }
+      #lay .part { border-radius: 7px; padding: 0 3px; transition: background 0.25s; }
+      #lay .part.hl-shape { background: #e9f3ee; }
+      #lay .part.hl-stride { background: #fbf1e3; }
+      #lay .tok.m0 { color: var(--g0s); }
+      #lay .tok.m1 { color: var(--g1s); }
+      #lay .tok.m2 { color: var(--g2s); }
+      #lay .tok.m3 { color: var(--g3s); }
+      #lay .tok.on.m0 { background: var(--g0); }
+      #lay .tok.on.m1 { background: var(--g1); }
+      #lay .tok.on.m2 { background: var(--g2); }
+      #lay .tok.on.m3 { background: var(--g3); }
+      #legend { display: flex; gap: 22px; margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 18px; }
+      #legend b { color: var(--ink); }
+      #phase {
+        margin-top: 10px;
+        font-size: 14px;
+        min-height: 22px;
+        color: var(--ink);
+      }
+      #phase code { background: #f3f6f4; padding: 0 4px; border-radius: 4px; }
+      #tables { display: flex; gap: 26px; margin-top: 14px; align-items: flex-start; flex-wrap: wrap; }
+      .tile-cap { font: 12px var(--mono); color: var(--muted); margin-bottom: 4px; }
+      .tile-cap span { border-radius: 4px; padding: 0 4px; }
+      table.grid { border-collapse: separate; border-spacing: 0; }
+      table.grid th {
+        font: 11px var(--mono);
+        color: var(--muted);
+        padding: 2px 4px;
+        border-radius: 5px;
+        transition: background 0.25s;
+      }
+      table.grid th.size {
+        font: 650 11px system-ui, sans-serif;
+        color: var(--ink);
+      }
+      table.grid td {
+        width: 52px;
+        height: 42px;
+        text-align: center;
+        border: 1px solid var(--line);
+        font: 700 17px var(--mono);
+        position: relative;
+        cursor: pointer;
+        transition: background 0.3s, outline-color 0.2s;
+        background: white;
+      }
+      table.grid td .plus {
+        position: absolute;
+        top: 1px;
+        right: 3px;
+        font: 650 9px var(--mono);
+        opacity: 0.8;
+      }
+      .m0.on, table.grid td.m0 { background: var(--g0); }
+      .m1.on, table.grid td.m1 { background: var(--g1); }
+      .m2.on, table.grid td.m2 { background: var(--g2); }
+      .m3.on, table.grid td.m3 { background: var(--g3); }
+      table.grid td.origin { background: #e9f3ee; outline: 2px solid var(--accent); outline-offset: -2px; }
+      table.grid th.corner { font: 650 10px system-ui, sans-serif; text-align: right; white-space: nowrap; }
+      table.grid td { color: var(--ink); }
+      table.grid td.walk { outline: 3px solid var(--accent); outline-offset: -3px; }
+      table.grid td.sel { outline: 3px solid var(--ink); outline-offset: -3px; }
+      .pair { display: flex; gap: 32px; align-items: flex-start; }
+      #calls { margin-top: 14px; font: 15px var(--mono); line-height: 1.55; }
+      #calls .call { margin-bottom: 8px; }
+      #calls .fn { font-weight: 700; color: var(--accent); }
+      #readout .fn { font-weight: 700; color: var(--accent); }
+      #readout { margin-top: 12px; font: 13px var(--mono); color: var(--muted); min-height: 20px; white-space: pre-wrap; }
+      #readout b { color: var(--ink); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>How a layout works</strong>
+      <small>Shape says how many coordinates each mode has. Stride says how far the offset moves per step in that mode.</small>
+    </header>
+
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <button id="replay">↻ Replay</button>
+      <span class="count" id="count"></span>
+      <span class="spacer"></span>
+      <div class="cases" id="cases"></div>
+    </div>
+
+    <p id="caption"></p>
+
+    <section class="panel">
+      <div id="lay"></div>
+      <div id="legend"></div>
+      <div id="phase"></div>
+      <div class="pair">
+        <div id="tables"></div>
+        <div id="calls"></div>
+      </div>
+      <div id="readout"></div>
+    </section>
+
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+
+        /*
+          A layout spec: modes in the order they appear in the layout string.
+          axis: which direction of the picture the mode walks ("row", "col", "tile").
+          Inside one axis, the first listed mode is the fastest (colexicographical).
+          build: the order strides are added during the animation.
+        */
+        const RM = {
+          text: "({s0},{s1}):({d0},{d1})",
+          modes: [
+            { size: 3, stride: 4, axis: "row", name: "mode 0 (rows)" },
+            { size: 4, stride: 1, axis: "col", name: "mode 1 (columns)" },
+          ],
+          build: [0, 1],
+        };
+        const CM = {
+          text: "({s0},{s1}):({d0},{d1})",
+          modes: [
+            { size: 3, stride: 1, axis: "row", name: "mode 0 (rows)" },
+            { size: 4, stride: 3, axis: "col", name: "mode 1 (columns)" },
+          ],
+          build: [0, 1],
+        };
+        const R3 = {
+          text: "({s0},{s1},{s2}):({d0},{d1},{d2})",
+          modes: [
+            { size: 2, stride: 12, axis: "tile", name: "mode 0 (blocks)" },
+            { size: 3, stride: 4, axis: "row", name: "mode 1 (rows)" },
+            { size: 4, stride: 1, axis: "col", name: "mode 2 (columns)" },
+          ],
+          build: [2, 1, 0],
+        };
+        const N1 = {
+          text: "({s0},({s1},{s2})):({d0},({d1},{d2}))",
+          modes: [
+            { size: 2, stride: 4, axis: "row", name: "mode 0 (rows)" },
+            { size: 2, stride: 2, axis: "col", name: "mode 1, inner (columns, fast)" },
+            { size: 2, stride: 1, axis: "col", name: "mode 1, outer (column groups)" },
+          ],
+          build: [0, 1, 2],
+        };
+        const N2 = {
+          text: "({s0},({s1},{s2})):({d0},({d1},{d2}))",
+          modes: [
+            { size: 3, stride: 3, axis: "row", name: "mode 0 (rows)" },
+            { size: 2, stride: 12, axis: "col", name: "mode 1, inner (columns, fast)" },
+            { size: 3, stride: 1, axis: "col", name: "mode 1, outer (column groups)" },
+          ],
+          build: [0, 1, 2],
+        };
+
+        const LAYOUTS = [
+          {
+            spec: RM, parts: true, label: "(3,4):(4,1)",
+            cap: `<b>Row-major <code>(3,4):(4,1)</code>.</b> Column stride 1 fills a row before the next row. Row stride 4 is the length of that row.`,
+            fns: [[1, 2]],
+          },
+          {
+            spec: CM, parts: false, label: "(3,4):(1,3)",
+            cap: `<b>Column-major <code>(3,4):(1,3)</code>.</b> Same shape. Row stride 1 fills a column before the next column. Column stride 3 is the length of that column.`,
+            fns: [[1, 2]],
+          },
+          {
+            spec: R3, parts: false, label: "(2,3,4):(12,4,1)",
+            cap: `<b>Row-major in three modes, <code>(2,3,4):(12,4,1)</code>.</b> Each stride is the product of the sizes to its right: 1, then 4, then 3·4 = 12. Mode 0 is the two blocks.`,
+            fns: [[1, 2, 3]],
+          },
+          {
+            spec: N1, parts: false, label: "(2,(2,2)):(4,(2,1))",
+            cap: `<b><code>(2,(2,2)):(4,(2,1))</code>.</b> Columns are one mode of shape (2,2): two groups of 2. Inside a group a step adds 2, the next group adds 1. Row 0 reads 0, 2, 1, 3.`,
+            nested: true,
+            fns: [[0, 1, 0], [0, 0, 1], [1, 1, 1]],
+          },
+          {
+            spec: N2, parts: false, label: "(3,(2,3)):(3,(12,1))",
+            cap: `<b><code>(3,(2,3)):(3,(12,1))</code>.</b> 3 rows, stride 3. Six columns as three groups of 2: inside a group a step adds 12, the next group adds 1. 18 cells, offsets up to 20, so 9, 10 and 11 are never used.`,
+            nested: true,
+            gapped: true,
+            fns: [[1, 1, 0], [0, 0, 1], [2, 1, 2]],
+            idx: { index: 15, crd: [2, 1, 0] },
+          },
+        ];
+
+        /* ---------- geometry ---------- */
+        const prod = (xs) => xs.reduce((p, x) => p * x, 1);
+        function axisModes(spec, axis) {
+          return spec.modes.map((m, k) => ({ ...m, k })).filter((m) => m.axis === axis);
+        }
+        function splitAxis(n, modes) {
+          const out = {};
+          for (const m of modes) {
+            out[m.k] = n % m.size;
+            n = Math.floor(n / m.size);
+          }
+          return out;
+        }
+        function offsetOf(spec, crd) {
+          return spec.modes.reduce((s, m, k) => s + crd[k] * m.stride, 0);
+        }
+        function enumerate(spec) {
+          const rowM = axisModes(spec, "row");
+          const colM = axisModes(spec, "col");
+          const tileM = axisModes(spec, "tile");
+          const R = prod(rowM.map((m) => m.size));
+          const C = prod(colM.map((m) => m.size));
+          const T = prod(tileM.map((m) => m.size));
+          const out = [];
+          for (let t = 0; t < T; t++) {
+            const tcrd = splitAxis(t, tileM);
+            for (let r = 0; r < R; r++) {
+              const rcrd = splitAxis(r, rowM);
+              for (let c = 0; c < C; c++) {
+                const ccrd = splitAxis(c, colM);
+                const crd = spec.modes.map((_, k) => rcrd[k] ?? ccrd[k] ?? tcrd[k] ?? 0);
+                out.push({ crd, off: offsetOf(spec, crd), key: crd.join(",") });
+              }
+            }
+          }
+          return out;
+        }
+        function legendOf(spec) {
+          return spec.modes
+            .map((m, k) => `<span><b style="color: var(--g${k}s)">${m.name}</b>: size ${m.size}, stride ${m.stride}</span>`)
+            .join("");
+        }
+        function makeFrames() {
+          const frames = [];
+          LAYOUTS.forEach((L, layoutIndex) => {
+            const spec = L.spec;
+            const all = enumerate(spec);
+            const shown = new Map();
+            const push = (extra) => frames.push({
+              layoutIndex, spec,
+              cap: extra.cap || L.cap,
+              phase: extra.phase || "",
+              hiShape: !!extra.hiShape,
+              hiStride: !!extra.hiStride,
+              hiSize: extra.hiSize ?? null,
+              hiStrideK: extra.hiStrideK ?? null,
+              fills: [...shown.values()],
+              hiKeys: extra.hiKeys || [],
+              calls: extra.calls || "",
+              legend: extra.legend ? legendOf(spec) : "",
+            });
+            const partsCap = `<b>A layout has two parts, shape and stride.</b> The shape is the left side: how many coordinates each mode has. Here, 3 rows and 4 columns. The stride is the right side: how far the offset moves when that coordinate increases by one.`;
+            push({ hiShape: true, cap: L.parts ? partsCap : L.cap, phase: `The shape draws the table. Next highlights each size.` });
+            spec.modes.forEach((m, k) => push({
+              hiShape: true, hiSize: k, legend: true,
+              cap: L.parts ? partsCap : L.cap,
+              phase: `<b style="color: var(--g${k}s)">${m.size}</b> is ${m.name}. Coordinates run from 0 to ${m.size - 1}.`,
+            }));
+            if (L.parts) {
+              push({ hiStride: true, legend: true, cap: partsCap, phase: `The stride is the right side. One step in a mode adds that mode’s stride to the offset.` });
+              spec.build.forEach((k) => {
+                const m = spec.modes[k];
+                push({ hiStride: true, hiStrideK: k, legend: true, cap: partsCap, phase: `${m.name}: one step adds <b>${m.stride}</b>.` });
+              });
+            }
+            const origin = all.find((c) => c.crd.every((v) => v === 0));
+            shown.set(origin.key, { key: origin.key, cls: "origin", plus: "" });
+            push({ legend: true, hiKeys: [origin.key], phase: `Offset <b>0</b> goes in the top-left cell.` });
+            const done = new Set();
+            for (const k of spec.build) {
+              const m = spec.modes[k];
+              done.add(k);
+              const dir = m.axis === "row" ? "down" : m.axis === "col" ? "right" : "to the next block";
+              for (let v = 1; v < m.size; v++) {
+                const batch = all.filter((c) => c.crd[k] === v && c.crd.every((x, j) => x === 0 || done.has(j)))
+                  .filter((c) => c.crd.every((x, j) => j === k || x === 0 || spec.build.indexOf(j) < spec.build.indexOf(k)));
+                batch.forEach((c) => shown.set(c.key, { key: c.key, cls: "m" + k, plus: "+" + m.stride }));
+                push({
+                  hiStrideK: k, legend: true, hiKeys: batch.map((c) => c.key),
+                  phase: `Move <b>${dir}</b>. The highlighted numbers are the cells behind them plus the stride <b>${m.stride}</b>.`,
+                });
+              }
+            }
+            for (const [k, v] of shown) shown.set(k, { key: v.key, cls: v.cls, plus: "" });
+            const max = Math.max(...all.map((c) => c.off));
+            push({
+              legend: true,
+              phase: max + 1 === all.length
+                ? `Every cell has its offset, 0 through ${max}. Click one to see the sum.`
+                : `${all.length} cells, offsets up to ${max}. Some offsets in between are never used. Click a cell to see the sum.`,
+            });
+            const line = (fn, value) => `<div class="call"><span class="fn">${fn}</span> = <b>${value}</b></div>`;
+            const coordOf = (crd) => spec.text.split(":")[0].replace(/\{s(\d)\}/g, (_, k) => crd[k]);
+            (L.fns || []).forEach((crd) => {
+              const off = offsetOf(spec, crd);
+              const coord = coordOf(crd);
+              const rows = [
+                line(`layout${coord}`, off),
+                line(`crd2idx(${coord}, layout)`, off),
+              ];
+              if (L.nested) {
+                const flat = crd[1] + spec.modes[1].size * crd[2];
+                const flatCoord = `(${crd[0]},${flat})`;
+                rows.push(line(`layout${flatCoord}`, off));
+                rows.push(line(`crd2idx(${flatCoord}, layout)`, off));
+              }
+              if (!L.gapped) rows.push(line(`idx2crd(${off}, layout)`, coord));
+              push({
+                legend: true,
+                hiKeys: [crd.join(",")],
+                phase: L.nested
+                  ? `The inner mode takes the pair or one flat integer. Calling the layout and crd2idx both return the offset.`
+                  : `Calling the layout and crd2idx both turn the coordinate into the offset. idx2crd turns that offset back into the coordinate.`,
+                calls: rows.join(""),
+              });
+            });
+            if (L.idx) {
+              const crd = L.idx.crd;
+              const back = offsetOf(spec, crd);
+              const coord = coordOf(crd);
+              const flat = crd[1] + spec.modes[1].size * crd[2];
+              const flatCoord = `(${crd[0]},${flat})`;
+              push({
+                legend: true,
+                hiKeys: [crd.join(",")],
+                phase: `idx2crd(${L.idx.index}, layout) returns ${coord}. Calling the layout on that coordinate returns ${back}.`,
+                calls: [
+                  line(`idx2crd(${L.idx.index}, layout)`, coord),
+                  line(`layout${coord}`, back),
+                  line(`layout${flatCoord}`, back),
+                  line(`crd2idx(${coord}, layout)`, back),
+                  line(`crd2idx(${flatCoord}, layout)`, back),
+                ].join(""),
+              });
+            }
+          });
+          return frames;
+        }
+        const frames = makeFrames();
+        const layoutStart = [];
+        frames.forEach((f, i) => { if (layoutStart[f.layoutIndex] === undefined) layoutStart[f.layoutIndex] = i; });
+        const caseButtons = LAYOUTS.map((L, i) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = L.label;
+          b.addEventListener("click", () => show(layoutStart[i]));
+          $("cases").appendChild(b);
+          return b;
+        });
+        let step = 0;
+
+        /* ---------- layout string ---------- */
+        function renderLay(spec) {
+          let shape = "", stride = "";
+          const [sText, dText] = spec.text.split(":");
+          shape = sText.replace(/\{s(\d)\}/g, (_, k) => `<span class="tok m${k}" data-s="${k}">${spec.modes[k].size}</span>`);
+          stride = dText.replace(/\{d(\d)\}/g, (_, k) => `<span class="tok m${k}" data-d="${k}">${spec.modes[k].stride}</span>`);
+          $("lay").innerHTML = `<span class="part" id="p-shape">${shape}</span>:<span class="part" id="p-stride">${stride}</span>`;
+          $("legend").innerHTML = "";
+        }
+        function tokOn(sel, on) {
+          document.querySelectorAll(sel).forEach((e) => e.classList.toggle("on", on));
+        }
+
+        /* ---------- tables ---------- */
+        let cells = [];
+        let heads = {};
+        function buildTables(spec) {
+          const host = $("tables");
+          host.innerHTML = "";
+          cells = [];
+          heads = {};
+          const rowM = axisModes(spec, "row");
+          const colM = axisModes(spec, "col");
+          const tileM = axisModes(spec, "tile");
+          const R = prod(rowM.map((m) => m.size));
+          const C = prod(colM.map((m) => m.size));
+          const T = prod(tileM.map((m) => m.size));
+          const addHead = (k, th) => (heads[k] = heads[k] || []).push(th);
+
+          for (let t = 0; t < T; t++) {
+            const wrap = document.createElement("div");
+            const tcrd = splitAxis(t, tileM);
+            if (tileM.length) {
+              const cap = document.createElement("div");
+              cap.className = "tile-cap";
+              const m = tileM[0];
+              cap.innerHTML = `<span class="m${m.k}">block ${t}</span>`;
+              heads[m.k] = heads[m.k] || [];
+              heads[m.k].push(cap.firstChild);
+              wrap.appendChild(cap);
+            }
+            const table = document.createElement("table");
+            table.className = "grid";
+
+            // column header rows: outermost column mode on top, fastest last
+            const colsTop = [...colM].reverse();
+            colsTop.forEach((m, depth) => {
+              const tr = document.createElement("tr");
+              const corner = document.createElement("th");
+              corner.className = "corner";
+              corner.style.color = `var(--g${m.k}s)`;
+              corner.textContent = `size ${m.size}`;
+              corner.colSpan = 2;
+              tr.appendChild(corner);
+              const inner = prod(colM.slice(0, colM.indexOf(m)).map((x) => x.size));
+              for (let c = 0; c < C; c += inner) {
+                const th = document.createElement("th");
+                th.colSpan = inner;
+                th.className = `m${m.k}`;
+                const v = Math.floor(c / inner) % m.size;
+                th.textContent = colM.length > 1 ? `${v}` : `${v}`;
+                addHead(m.k, th);
+                tr.appendChild(th);
+              }
+              table.appendChild(tr);
+            });
+
+            for (let r = 0; r < R; r++) {
+              const tr = document.createElement("tr");
+              if (r === 0) {
+                const side = document.createElement("th");
+                side.className = "corner";
+                side.rowSpan = R;
+                side.style.color = `var(--g${rowM[0].k}s)`;
+                side.textContent = `size ${rowM[0].size}`;
+                tr.appendChild(side);
+              }
+              const th = document.createElement("th");
+              th.className = `m${rowM[0].k}`;
+              th.textContent = r;
+              addHead(rowM[0].k, th);
+              tr.appendChild(th);
+              const rcrd = splitAxis(r, rowM);
+              for (let c = 0; c < C; c++) {
+                const ccrd = splitAxis(c, colM);
+                const crd = spec.modes.map((_, k) => rcrd[k] ?? ccrd[k] ?? tcrd[k] ?? 0);
+                const td = document.createElement("td");
+                const cell = { td, crd, off: offsetOf(spec, crd), r, c, t };
+                td.addEventListener("click", () => selectCell(spec, cell));
+                cells.push(cell);
+                tr.appendChild(td);
+              }
+              table.appendChild(tr);
+            }
+            wrap.appendChild(table);
+            host.appendChild(wrap);
+          }
+        }
+
+        function sizeLabels(spec) {
+          return spec.modes
+            .map((m, k) => `<span><b class="m${k}" style="color: var(--g${k}s)">${m.name}</b>: size ${m.size}, stride ${m.stride}</span>`)
+            .join("");
+        }
+
+        function headOn(k, on) {
+          (heads[k] || []).forEach((th) => th.classList.toggle("on", on));
+        }
+        function clearCells() {
+          cells.forEach((c) => {
+            c.td.textContent = "";
+            c.td.className = "";
+          });
+        }
+        function setCell(cell, cls, plus) {
+          cell.td.innerHTML = `${cell.off}${plus ? `<span class="plus">${plus}</span>` : ""}`;
+          cell.td.className = cls;
+        }
+
+        function selectCell(spec, cell) {
+          if (!cell.td.textContent) return;
+          cells.forEach((c) => c.td.classList.remove("sel"));
+          cell.td.classList.add("sel");
+          const terms = spec.modes.map((m, k) => `${cell.crd[k]}·${m.stride}`).join(" + ");
+          const coord = spec.text.split(":")[0].replace(/\{s(\d)\}/g, (_, k) => cell.crd[k]);
+          const L = LAYOUTS[frames[step].layoutIndex];
+          const rows = [
+            `${terms} = <b>${cell.off}</b>`,
+            `<span class="fn">layout${coord}</span> = <b>${cell.off}</b>`,
+            `<span class="fn">crd2idx(${coord}, layout)</span> = <b>${cell.off}</b>`,
+          ];
+          if (L.nested) {
+            const flat = cell.crd[1] + spec.modes[1].size * cell.crd[2];
+            const flatCoord = `(${cell.crd[0]},${flat})`;
+            rows.push(`<span class="fn">layout${flatCoord}</span> = <b>${cell.off}</b>`);
+            rows.push(`<span class="fn">crd2idx(${flatCoord}, layout)</span> = <b>${cell.off}</b>`);
+          }
+          if (!L.gapped) rows.push(`<span class="fn">idx2crd(${cell.off}, layout)</span> = <b>${coord}</b>`);
+          $("readout").innerHTML = rows.join("<br>");
+        }
+
+        let shownSpec = null;
+        function show(i) {
+          step = Math.max(0, Math.min(frames.length - 1, i));
+          const f = frames[step];
+          if (shownSpec !== f.spec) {
+            shownSpec = f.spec;
+            buildTables(f.spec);
+          }
+          renderLay(f.spec);
+          if (f.hiShape) $("p-shape").classList.add("hl-shape");
+          if (f.hiStride) $("p-stride").classList.add("hl-stride");
+          if (f.hiSize !== null) tokOn(`[data-s="${f.hiSize}"]`, true);
+          if (f.hiStrideK !== null) {
+            tokOn(`[data-s="${f.hiStrideK}"]`, true);
+            tokOn(`[data-d="${f.hiStrideK}"]`, true);
+          }
+          f.spec.modes.forEach((_, k) => headOn(k, k === f.hiSize || k === f.hiStrideK));
+          const byKey = new Map(cells.map((c) => [c.crd.join(","), c]));
+          cells.forEach((c) => { c.td.textContent = ""; c.td.className = ""; });
+          f.fills.forEach((fill) => {
+            const c = byKey.get(fill.key);
+            setCell(c, fill.cls + (f.hiKeys.includes(fill.key) ? " walk" : ""), fill.plus);
+          });
+          $("caption").innerHTML = f.cap;
+          $("phase").innerHTML = f.phase;
+          $("legend").innerHTML = f.legend;
+          $("readout").textContent = "";
+          $("calls").innerHTML = f.calls;
+          caseButtons.forEach((b, j) => b.classList.toggle("on", j === f.layoutIndex));
+          const start = layoutStart[f.layoutIndex];
+          const end = (layoutStart[f.layoutIndex + 1] ?? frames.length) - 1;
+          $("count").textContent = `step ${step - start + 1} / ${end - start + 1}`;
+          $("prev").disabled = step === start;
+          $("next").disabled = step === end;
+        }
+
+        $("next").addEventListener("click", () => show(step + 1));
+        $("prev").addEventListener("click", () => show(step - 1));
+        $("replay").addEventListener("click", () => show(layoutStart[frames[step].layoutIndex]));
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") show(step + 1);
+          else if (e.key === "ArrowLeft") show(step - 1);
+        });
+        show(0);
+      })();
+    </script>
+  </body>
+</html>

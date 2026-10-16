@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Introduction</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      a { color: var(--accent); text-decoration: none; }
+      header {
+        padding: 14px 28px; background: white; border-bottom: 1px solid var(--line);
+        display: flex; gap: 16px; align-items: baseline;
+      }
+      header strong { font-size: 18px; }
+      header small { color: var(--muted); font-size: 14px; }
+      .hero {
+        margin: 18px 28px 0; padding: 18px 22px; border-radius: 14px;
+        background: linear-gradient(100deg, #e4f0ec 0%, #e8eff8 100%);
+        border: 1px solid var(--line); display: flex; gap: 16px; align-items: center;
+      }
+      .hero svg { flex: none; }
+      .hero h1 { margin: 0; font-size: 26px; letter-spacing: -0.3px; }
+      .hero p { margin: 4px 0 0; font-size: 19px; color: var(--muted); line-height: 1.4; }
+      .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 16px 28px 28px; align-items: start; }
+      .card {
+        background: white; border: 1px solid var(--line); border-top: 4px solid var(--tone);
+        border-radius: 14px; padding: 12px 16px 14px; min-width: 0;
+      }
+      .card.copy { --tone: #3c7bbf; --tint: #e3edf8; }
+      .card.mma { --tone: #11695a; --tint: #e4f0ec; }
+      .card .head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+      .card .icon {
+        width: 40px; height: 40px; border-radius: 10px; background: var(--tint);
+        display: grid; place-items: center; flex: none;
+      }
+      .card .k { font-size: 15px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: var(--tone); }
+      .card .src { font: 13px var(--mono); color: var(--muted); margin-top: 2px; }
+      pre { margin: 0; font: 600 14px var(--mono); line-height: 1.5; white-space: pre; overflow-x: auto; }
+      pre .cm { color: var(--muted); font-weight: 500; }
+      pre .fn { color: var(--accent); }
+      pre .num { color: #c47b2b; }
+      pre .kw { color: #7d4fae; }
+      pre .str { color: #b9443a; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="index.html">Tile abstraction</a>
+      <strong>Introduction</strong>
+      <small>two kernels</small>
+    </header>
+    <div class="hero">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#11695a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" fill="#cfe3f7" stroke="#3c7bbf" />
+      </svg>
+      <div>
+        <h1>Two kernels</h1>
+        <p>A tiled copy and a tiled MMA. The rest of the series explains the layouts behind these lines.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="card copy">
+        <div class="head">
+          <div class="icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3c7bbf" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="8" y="8" width="12" height="12" rx="2" />
+              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+            </svg>
+          </div>
+          <div>
+            <div class="k">Tiled copy</div>
+            <div class="src">examples/02-tiledCopy.py</div>
+          </div>
+        </div>
+        <pre id="copy"></pre>
+      </div>
+      <div class="card mma">
+        <div class="head">
+          <div class="icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#11695a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+            </svg>
+          </div>
+          <div>
+            <div class="k">Tiled MMA</div>
+            <div class="src">examples/03-tiledMma.py</div>
+          </div>
+        </div>
+        <pre id="mma"></pre>
+      </div>
+    </div>
+    <script type="text/plain" id="copy-src">@flyc.kernel
+def copy_kernel(
+    A: fx.Tensor,
+    B: fx.Tensor,
+):
+    tid = fx.thread_idx.x
+    bid = fx.block_idx.x
+
+    block_m = 8
+    block_n = 24
+
+    A = fx.rocdl.make_buffer_tensor(A)
+    B = fx.rocdl.make_buffer_tensor(B)
+
+    bA = fx.zipped_divide(A, (block_m, block_n))
+    bB = fx.zipped_divide(B, (block_m, block_n))
+    bA = fx.slice(bA, (None, bid))
+    bB = fx.slice(bB, (None, bid))
+
+    thr_layout = fx.make_layout((4, 1), (1, 1))
+    val_layout = fx.make_layout((1, 8), (1, 1))
+    copy_atom = fx.make_copy_atom(fx.rocdl.BufferCopy128b(), fx.Float32)
+    tile_mn, tv_layout = fx.make_layout_tv(thr_layout, val_layout)
+
+    tiled_copy = fx.make_tiled_copy(copy_atom, tv_layout, tile_mn)
+    thr_copy = tiled_copy.get_slice(tid)
+
+    partition_src = thr_copy.partition_S(bA)
+    partition_dst = thr_copy.partition_D(bB)
+
+    frag = fx.make_fragment_like(partition_src)
+
+    fx.copy(copy_atom, partition_src, frag)
+    fx.copy(copy_atom, frag, partition_dst)</script>
+    <script type="text/plain" id="mma-src">@flyc.kernel
+def gemm_kernel(
+    A: fx.Tensor,
+    B: fx.Tensor,
+    C: fx.Tensor,
+):
+    tid = fx.thread_idx.x
+    bid = fx.block_idx.x
+
+    A = fx.rocdl.make_buffer_tensor(A)
+    B = fx.rocdl.make_buffer_tensor(B)
+    C = fx.rocdl.make_buffer_tensor(C)
+
+    bA = fx.zipped_divide(A, (block_m, block_k))
+    bB = fx.zipped_divide(B, (block_n, block_k))
+    bC = fx.zipped_divide(C, (block_m, block_n))
+
+    bA = fx.slice(bA, (None, bid))
+    bB = fx.slice(bB, (None, bid))
+    bC = fx.slice(bC, (None, bid))
+
+    mma_atom = fx.make_mma_atom(fx.rocdl.MFMA(16, 16, 4, fx.Float32))
+    print("%s", mma_atom.layout_A_tv)
+    tiled_mma = fx.make_tiled_mma(mma_atom, fx.make_layout((2, 2, 1), (1, 2, 0)))
+    thr_mma = tiled_mma.thr_slice(tid)
+
+    copy_atom = fx.make_copy_atom(fx.rocdl.BufferCopy32b(), fx.Float32)
+    tiled_copy_A = fx.make_tiled_copy_A(copy_atom, tiled_mma)
+    tiled_copy_B = fx.make_tiled_copy_B(copy_atom, tiled_mma)
+    tiled_copy_C = fx.make_tiled_copy_C(copy_atom, tiled_mma)
+
+    thr_copy_A = tiled_copy_A.get_slice(tid)
+    thr_copy_B = tiled_copy_B.get_slice(tid)
+    thr_copy_C = tiled_copy_C.get_slice(tid)
+
+    copy_src_A = thr_copy_A.partition_S(bA)
+    copy_src_B = thr_copy_B.partition_S(bB)
+    copy_dst_C = thr_copy_C.partition_S(bC)
+
+    frag_A = thr_mma.make_fragment_A(bA)
+    frag_B = thr_mma.make_fragment_B(bB)
+    frag_C = thr_mma.make_fragment_C(bC)
+
+    copy_frag_A = thr_copy_A.retile(frag_A)
+    copy_frag_B = thr_copy_B.retile(frag_B)
+    copy_frag_C = thr_copy_C.retile(frag_C)
+
+    fx.copy(copy_atom, copy_src_A, copy_frag_A, pred=None)
+    fx.copy(copy_atom, copy_src_B, copy_frag_B, pred=None)
+
+    frag_C.fill(0)
+    fx.gemm(mma_atom, frag_C, frag_A, frag_B, frag_C)
+
+    fx.copy(copy_atom, copy_frag_C, copy_dst_C, pred=None)</script>
+    <script>
+      (() => {
+        const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const KW = new Set(["def", "None", "return", "for", "in", "if", "else"]);
+        const hi = (line) => {
+          let html = "";
+          for (const m of line.matchAll(/#.*$|"[^"]*"|@\w+(?:\.\w+)*|\d+|[A-Za-z_]\w*|./g)) {
+            const tok = m[0];
+            let cls = "";
+            if (tok.startsWith("#")) cls = "cm";
+            else if (tok.startsWith('"')) cls = "str";
+            else if (tok.startsWith("@")) cls = "kw";
+            else if (/^\d+$/.test(tok)) cls = "num";
+            else if (KW.has(tok)) cls = "kw";
+            else if (/^[A-Za-z_]/.test(tok) && line[m.index + tok.length] === "(") cls = "fn";
+            html += cls ? `<span class="${cls}">${esc(tok)}</span>` : esc(tok);
+          }
+          return html;
+        };
+        for (const id of ["copy", "mma"])
+          document.getElementById(id).innerHTML = document.getElementById(`${id}-src`).textContent.split("\n").map(hi).join("\n");
+      })();
+    </script>
+  </body>
+</html>

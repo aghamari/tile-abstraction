@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Composition</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --hitbg: #e9f3ee;
+        --soft: #f3f7ea;
+        --b: #3c7bbf;
+        --bbg: #e7f1fb;
+        --a: #11695a;
+        --abg: #e9f3ee;
+        --c: #7d4fae;
+        --cbg: #f3eaf8;
+        --x: #c47b2b;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body { margin: 0; }
+      a { color: var(--accent); text-decoration: none; }
+      code { font-family: var(--mono); }
+      header {
+        padding: 14px 28px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+      }
+      header strong { font-size: 18px; }
+      header small { color: var(--muted); font-size: 14px; }
+      .bar { display: flex; align-items: center; gap: 8px; padding: 14px 28px 0; flex-wrap: wrap; }
+      button {
+        font: inherit; font-size: 15px; color: inherit; background: white;
+        border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.on { border-color: var(--accent); background: #e9f3ee; color: var(--accent); font-weight: 650; }
+      .count { font-size: 14px; color: var(--muted); margin-left: 8px; }
+      #formula {
+        margin: 16px 28px 0;
+        font: 700 34px var(--mono);
+        letter-spacing: -0.5px;
+      }
+      #caption {
+        margin: 10px 28px 0;
+        font-size: 24px;
+        line-height: 1.35;
+        min-height: 68px;
+        max-width: 980px;
+      }
+      .panel { margin: 8px 28px 28px; display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+      .card {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px 16px;
+      }
+      .card .k { font-size: 13px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+      .card .v { font: 700 18px var(--mono); margin: 4px 0 10px; }
+      table.g { border-collapse: separate; border-spacing: 4px; }
+      table.g th { font: 13px var(--mono); color: var(--muted); font-weight: 500; }
+      table.g td {
+        width: 52px; height: 44px; text-align: center; cursor: pointer;
+        border-radius: 6px; background: white; border: 1px solid var(--line);
+        font: 700 18px var(--mono);
+      }
+      td.hit { outline: 3px solid var(--ink); outline-offset: -3px; }
+      #b-card.hold { visibility: hidden; }
+      #b-card { border-color: var(--b); }
+      #src-card { border-color: var(--a); }
+      #view-card { border-color: var(--c); }
+      #b-card .k, #formula .b, #path .b { color: var(--b); }
+      #src-card .k, #formula .a, #path .a { color: var(--a); }
+      #view-card .k, #formula .c, #path .c { color: var(--c); }
+      #path .x { color: var(--x); }
+      #path { margin-top: 16px; font: 700 22px var(--mono); line-height: 1.45; min-height: 40px; flex-basis: 100%; }
+      #path .acc { color: var(--accent); }
+      .groups { display: flex; gap: 16px; flex-wrap: wrap; }
+      .groups .card { min-width: 280px; }
+      .groups .v { font-size: 20px; line-height: 1.35; }
+      .groups .call { font: 700 22px var(--mono); margin-top: 8px; }
+      table.g.matrix { border-spacing: 2px; }
+      table.g.matrix td { width: 42px; min-width: 42px; height: 34px; min-height: 34px; font-size: 15px; border-radius: 4px; }
+      table.g.matrix th { font-size: 12px; padding: 0; }
+      #src.matrix td.tt { border-top: 2px solid var(--ink); }
+      #src.matrix td.tb { border-bottom: 2px solid var(--ink); }
+      #src.matrix td.tl { border-left: 2px solid var(--ink); }
+      #src.matrix td.tr { border-right: 2px solid var(--ink); }
+      table.g.compact td { width: 34px; height: 30px; font-size: 13px; cursor: default; }
+      table.g.compact th { font-size: 11px; }
+      .split { display: flex; gap: 16px; align-items: flex-start; }
+      .split .cap { font: 700 14px var(--mono); color: var(--muted); margin-bottom: 4px; }
+      .modes { display: flex; gap: 16px; }
+      .pair { display: flex; gap: 6px; padding: 8px; border-radius: 12px; border: 2px solid transparent; }
+      .pair.on { border-color: var(--ink); }
+      .mode {
+        width: 68px; height: 78px; border-radius: 8px; border: 1px solid var(--line);
+        background: white; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-family: var(--mono); font-weight: 700;
+      }
+      .mode b { font-size: 22px; }
+      .mode i { font-style: normal; font-size: 14px; color: var(--muted); }
+      .mode em { font-style: normal; font-size: 16px; color: var(--accent); min-height: 20px; }
+      .pair.on .mode { background: #d6e6f8; }
+      #pair1.on .mode { background: #f6e4c8; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="index.html">Tile abstraction</a>
+      <strong>Composition</strong>
+      <small>A stays, Next shows B</small>
+    </header>
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <span class="count" id="count"></span>
+      <span id="cases"></span>
+    </div>
+    <div id="formula">composition(<span class="a">A</span>, <span class="b">B</span>) = <span class="a">A</span> ∘ <span class="b">B</span></div>
+    <p id="caption"></p>
+    <section class="panel">
+      <div class="card" id="b-card">
+        <div class="k" id="b-k">B · the coordinate</div>
+        <div class="v" id="b-v"></div>
+        <div class="split">
+          <div>
+            <div class="cap" id="b-cap0" hidden></div>
+            <table class="g" id="bgrid"></table>
+          </div>
+          <div id="b-side" hidden>
+            <div class="cap" id="b-cap1"></div>
+            <table class="g compact" id="bgrid2"></table>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="src-card">
+        <div class="k" id="a-k">A · source</div>
+        <div class="v" id="a-v">(3,4):(4,1)</div>
+        <div class="modes" id="modes" hidden>
+          <div class="pair" id="pair0">
+            <div class="mode"><b>4</b><i>16</i><em id="m0"></em></div>
+            <div class="mode"><b>4</b><i>2</i><em id="m1"></em></div>
+          </div>
+          <div class="pair" id="pair1">
+            <div class="mode"><b>2</b><i>1</i><em id="m2"></em></div>
+            <div class="mode"><b>2</b><i>8</i><em id="m3"></em></div>
+          </div>
+        </div>
+        <table class="g" id="src"></table>
+      </div>
+      <div class="card" id="view-card">
+        <div class="k">C · A ∘ B</div>
+        <div class="v" id="view-v"></div>
+        <table class="g" id="view"></table>
+      </div>
+      <div class="groups" id="groups"></div>
+      <div id="path"></div>
+    </section>
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        const CASES = [
+          {
+            id: "keep",
+            label: "Keep positions",
+            b: "(3,4):(1,3)",
+            bStride: [1, 3],
+            view: "(3,4):(4,1)",
+            cStride: [4, 1],
+            rows: 3,
+            cols: 4,
+            pick: [1, 2],
+            note: "Keep positions. B’s coordinate lands on the same source cell.",
+          },
+          {
+            id: "repeat",
+            label: "Repeat a row",
+            b: "(3,4):(0,3)",
+            bStride: [0, 3],
+            view: "(3,4):(0,1)",
+            cStride: [0, 1],
+            rows: 3,
+            cols: 4,
+            pick: [2, 1],
+            note: "Repeat a row. B’s row stride is 0, so every row names the same source row.",
+          },
+          {
+            id: "skip",
+            label: "Every other column",
+            b: "(3,2):(1,6)",
+            bStride: [1, 6],
+            view: "(3,2):(4,2)",
+            cStride: [4, 2],
+            rows: 3,
+            cols: 2,
+            pick: [1, 1],
+            note: "Every other column. B’s stride 6 skips one source column.",
+          },
+          {
+            id: "rename",
+            label: "Rename",
+            b: "(4):(2)",
+            a: "(8):(1)",
+            view: "4:2",
+            rows: 1,
+            cols: 4,
+            pick: [0, 1],
+            note: "Rename. A’s stride is 1, so B’s offset passes through unchanged.",
+          },
+          {
+            id: "transpose",
+            label: "Transpose",
+            b: "(4,3):(3,1)",
+            bStride: [3, 1],
+            view: "(4,3):(1,4)",
+            cStride: [1, 4],
+            rows: 4,
+            cols: 3,
+            pick: [1, 2],
+            note: "Transpose. B is 4×3, so the view is taller than the source.",
+          },
+          {
+            id: "grouping",
+            label: "Grouping",
+            pick: [4, 2],
+            frames: [
+              "Composition also sets the parentheses. B’s shape says how A’s modes are grouped.",
+              "The inverse is four modes. Composition with a rank-2 layout groups them in pairs.",
+              "4×4 = 16 and 2×2 = 4. The grouped shape is (16, 4).",
+              "One offset, three ways to write the coordinate. 4 opens as (0, 1). 2 opens as (0, 1).",
+            ],
+            paths: [
+              "",
+              "(4, 4, 2, 2)  →  ((4, 4), (2, 2))",
+              "4×4 = <span class='acc'>16</span> &nbsp;&nbsp; 2×2 = <span class='acc'>4</span>",
+              "(0, 1, 0, 1) = ((0, 1), (0, 1)) = (4, 2)  →  <span class='acc'>10</span>",
+            ],
+          },
+        ];
+
+        const dot = (coef, value) => `${coef}·${value}`;
+
+        const fill = (r, c) => `hsl(${(r * 4 + c) * 27} 48% 80%)`;
+        const land = (c, i, j) => {
+          const n = c.bStride[0] * i + c.bStride[1] * j;
+          return [n % 3, Math.floor(n / 3)];
+        };
+
+        function tvAt(t, v) {
+          const t0 = t % 4;
+          const t1 = Math.floor(t / 4);
+          const v0 = v % 2;
+          const v1 = Math.floor(v / 2);
+          return 16 * t0 + 2 * t1 + v0 + 8 * v1;
+        }
+
+        function grid(table, rows, cols, at, pick, clickable, colorAt, cellClass) {
+          table.innerHTML = "";
+          const head = document.createElement("tr");
+          head.innerHTML = "<th></th>" + [...Array(cols).keys()].map((j) => `<th>${j}</th>`).join("");
+          table.appendChild(head);
+          for (let i = 0; i < rows; i++) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<th>${i}</th>` + [...Array(cols).keys()].map((j) => {
+              const on = pick && pick[0] === i && pick[1] === j;
+              const bg = colorAt ? colorAt(i, j) : "";
+              const extra = cellClass ? cellClass(i, j) : "";
+              return `<td data-i="${i}" data-j="${j}" class="${on ? "hit" : ""} ${extra}"${bg ? ` style="background:${bg}"` : ""}>${at(i, j)}</td>`;
+            }).join("");
+            table.appendChild(tr);
+          }
+          if (clickable) {
+            table.onclick = (event) => {
+              const td = event.target.closest("td");
+              if (!td) return;
+              pickI = +td.dataset.i;
+              pickJ = +td.dataset.j;
+              show();
+            };
+          }
+        }
+
+        const src = $("src");
+        $("cases").innerHTML = CASES.map((c) => `<button type="button" data-id="${c.id}">${c.label}</button>`).join("");
+
+        let caseId = "keep";
+        let step = 0;
+        let pickI = 1;
+        let pickJ = 2;
+        const STEPS = 3;
+
+        function line(text) {
+          return `<div>${text}</div>`;
+        }
+
+        function show() {
+          const c = CASES.find((item) => item.id === caseId);
+          const grouping = c.id === "grouping";
+          const rename = c.id === "rename";
+          $("groups").hidden = true;
+          $("modes").hidden = true;
+          $("src").hidden = false;
+          $("b-side").hidden = true;
+          $("b-cap0").hidden = true;
+          $("view").hidden = false;
+          $("bgrid").classList.toggle("matrix", grouping);
+          $("src").classList.toggle("matrix", grouping);
+          $("view").classList.toggle("matrix", grouping);
+          $("b-k").textContent = grouping ? "B · 16×4" : "B · the coordinate";
+          $("a-k").textContent = grouping ? "A · tiled 8×8" : "A · source";
+          $("src-card").hidden = false;
+          $("b-card").hidden = false;
+          $("b-card").classList.toggle("hold", step < 1);
+          $("view-card").hidden = step < 2;
+          if (!grouping) src.onclick = null;
+          if (grouping) {
+            const t = pickI;
+            const v = pickJ;
+            const n = tvAt(t, v);
+            const row = n % 8;
+            const col = Math.floor(n / 8);
+            const t0 = t % 4;
+            const t1 = Math.floor(t / 4);
+            const v0 = v % 2;
+            const v1 = Math.floor(v / 2);
+            const caps = [
+              "A is the whole 8×8, all 64 cells. A dark box is one thread’s 2×2.",
+              "B is 16×4. The row is the thread group and the column is the value. The number is the same cell of A.",
+              "C is 16×4 as well. C(thread, value) is that same cell of A.",
+            ];
+            $("caption").textContent = caps[step];
+            $("a-v").textContent = "(8, 8)";
+            $("b-v").textContent = "(16, 4)";
+            $("view-v").textContent = "((4,4),(2,2)):((16,2),(1,8))";
+            const lines = [];
+            if (step >= 1) {
+              lines.push(line(`<span class="b">B(${t}, ${v}) = ${n}</span>`));
+              lines.push(line(`<span class="a">A row ${row}, column ${col}</span>`));
+            }
+            if (step >= 2) {
+              lines.push(line(`<span class="x">${t} = ${t0} + 4·${t1} &nbsp;&nbsp; ${v} = ${v0} + 2·${v1}</span>`));
+              lines.push(line(`<span class="c">16·${t0} + 2·${t1} + ${v0} + 8·${v1} = ${n}</span>`));
+            }
+            $("path").innerHTML = lines.join("");
+            const paint = (k) => `hsl(${(k * 47) % 360} 46% 78%)`;
+            grid($("bgrid"), 16, 4, (i, j) => tvAt(i, j), [t, v], true, (i, j) => paint(tvAt(i, j)));
+            grid($("view"), 16, 4, (i, j) => tvAt(i, j), [t, v], true, (i, j) => paint(tvAt(i, j)));
+            grid(src, 8, 8, (i, j) => i + 8 * j, [row, col], false, (i, j) => paint(i + 8 * j), (i, j) =>
+              `${i % 2 === 0 ? "tt" : "tb"} ${j % 2 === 0 ? "tl" : "tr"}`);
+            src.onclick = (event) => {
+              const td = event.target.closest("td");
+              if (!td) return;
+              const found = +td.dataset.i + 8 * +td.dataset.j;
+              for (let ti = 0; ti < 16; ti++) {
+                for (let vi = 0; vi < 4; vi++) {
+                  if (tvAt(ti, vi) === found) {
+                    pickI = ti;
+                    pickJ = vi;
+                    show();
+                    return;
+                  }
+                }
+              }
+            };
+          } else if (rename) {
+            const j = pickJ;
+            const n = 2 * j;
+            const caps = [
+              "A is (8):(1). Stride 1 copies whatever offset B names.",
+              `${c.note} Select a cell of B.`,
+              "C prints 4:2. The coordinate 0, 1, 2, 3 now names 0, 2, 4, 6.",
+            ];
+            $("caption").textContent = caps[step];
+            $("b-v").textContent = c.b;
+            $("a-v").textContent = c.a;
+            $("view-v").textContent = c.view;
+            const lines = [];
+            if (step >= 1) {
+              lines.push(line(`<span class="b">B(${j}) = 2·${j} = ${n}</span>`));
+              lines.push(line(`<span class="a">A(${n}) = 1·${n} = ${n}</span>`));
+            }
+            if (step >= 2) lines.push(line(`<span class="c">C(${j}) = 2·${j} = ${n}</span>`));
+            $("path").innerHTML = lines.join("");
+            grid($("bgrid"), 1, 4, (i, col) => 2 * col, [0, j], true, (i, col) => fill(0, col));
+            grid(src, 1, 8, (i, col) => col, step >= 1 ? [0, n] : null, false, (i, col) => (step === 0 || col % 2 === 0) ? fill(0, step === 0 ? col : col / 2) : "");
+            grid($("view"), 1, 4, (i, col) => 2 * col, step >= 2 ? [0, j] : null, true, (i, col) => fill(0, col));
+          } else {
+            $("a-v").textContent = "(3,4):(4,1)";
+            const [si, sj] = c.bStride;
+            const [ci, cj] = c.cStride;
+            const n = si * pickI + sj * pickJ;
+            const ar = n % 3;
+            const ac = Math.floor(n / 3);
+            const off = 4 * ar + ac;
+            const caps = [
+              "A is the source, (3, 4):(4, 1). Offset = 4·row + column.",
+              `${c.note} Select a cell of B.`,
+              `A reads that coordinate. C prints ${c.view}.`,
+            ];
+            $("caption").textContent = caps[step];
+            $("b-v").textContent = c.b;
+            $("view-v").textContent = c.view;
+            const lines = [];
+            if (step >= 1) {
+              lines.push(line(`<span class="b">B(${pickI}, ${pickJ}) = ${dot(si, pickI)} + ${dot(sj, pickJ)} = ${n}</span>`));
+              lines.push(line(`<span class="x">colex  ${n} mod 3 = ${ar}   row</span>`));
+              lines.push(line(`<span class="x">colex  ${n} ÷ 3 = ${ac}   column</span>`));
+              lines.push(line(`<span class="a">A(row ${ar}, column ${ac}) = ${dot(4, ar)} + ${dot(1, ac)} = ${off}</span>`));
+            }
+            if (step >= 2) {
+              lines.push(line(`<span class="c">C(${pickI}, ${pickJ}) = ${dot(ci, pickI)} + ${dot(cj, pickJ)} = ${off}</span>`));
+            }
+            $("path").innerHTML = lines.join("");
+            const reached = new Set();
+            for (let i = 0; i < c.rows; i++) {
+              for (let j = 0; j < c.cols; j++) {
+                const [r, col] = land(c, i, j);
+                reached.add(`${r},${col}`);
+              }
+            }
+            const viewColor = (i, j) => {
+              const [r, col] = land(c, i, j);
+              return fill(r, col);
+            };
+            grid($("bgrid"), c.rows, c.cols, (i, j) => c.bStride[0] * i + c.bStride[1] * j, [pickI, pickJ], true, viewColor);
+            grid(src, 3, 4, (i, j) => 4 * i + j, step >= 1 ? [ar, ac] : null, false, (i, j) => (step === 0 || reached.has(`${i},${j}`)) ? fill(i, j) : "");
+            grid($("view"), c.rows, c.cols, (i, j) => c.cStride[0] * i + c.cStride[1] * j, step >= 2 ? [pickI, pickJ] : null, true, viewColor);
+          }
+          document.querySelectorAll("#cases button").forEach((b) => b.classList.toggle("on", b.dataset.id === caseId));
+          $("count").textContent = `${step + 1} / ${grouping || rename ? 3 : STEPS}`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === ((grouping || rename) ? 2 : STEPS - 1);
+        }
+
+        $("cases").addEventListener("click", (event) => {
+          const button = event.target.closest("button");
+          if (!button) return;
+          caseId = button.dataset.id;
+          step = 0;
+          const chosen = CASES.find((item) => item.id === caseId);
+          if (chosen.pick) { pickI = chosen.pick[0]; pickJ = chosen.pick[1]; }
+          show();
+        });
+        $("next").addEventListener("click", () => { step += 1; show(); });
+        $("prev").addEventListener("click", () => { step -= 1; show(); });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight" && !$("next").disabled) { step += 1; show(); }
+          else if (e.key === "ArrowLeft" && !$("prev").disabled) { step -= 1; show(); }
+        });
+        show();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>right_inverse · step by step</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --off: #3c7bbf;
+        --offbg: #cfe3f7;
+        --flat: #c47b2b;
+        --flatbg: #f6dcc0;
+        --bad: #b9443a;
+        --badbg: #fbe3e1;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      code { font-family: var(--mono); }
+      header {
+        padding: 10px 16px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      header strong { font-size: 15px; }
+      header small { color: var(--muted); font-size: 12px; }
+      .bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px 0; flex-wrap: wrap; }
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: inherit;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.on { border-color: var(--accent); background: #e9f3ee; color: var(--accent); font-weight: 650; }
+      .spacer { flex: 1; }
+      .count { font-size: 12px; color: var(--muted); min-width: 64px; }
+      .cases { display: flex; gap: 6px; flex-wrap: wrap; }
+      .cases button { font-family: var(--mono); font-size: 12px; }
+      #caption {
+        margin: 10px 16px 0;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.6;
+        min-height: 54px;
+      }
+      .panel {
+        margin: 12px 16px 16px;
+        padding: 16px 18px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      #phase { font-size: 14px; min-height: 44px; line-height: 1.55; }
+      #calc { padding-top: 24px; font: 700 18px var(--mono); line-height: 1.45; min-width: 320px; }
+      #calc .x { color: var(--flat); }
+      #calc .rv { color: var(--off); }
+      #phase code { background: #f3f6f4; padding: 0 4px; border-radius: 4px; }
+      .key { display: flex; gap: 18px; font-size: 12px; color: var(--muted); margin: 6px 0 12px; }
+      .key b.o { color: var(--off); }
+      .key b.f { color: var(--flat); }
+      .row2 { display: flex; gap: 34px; align-items: flex-start; flex-wrap: nowrap; }
+      h3 { font-size: 13px; margin: 0 0 6px; }
+      h3 code { font-weight: 500; color: var(--muted); }
+      table.a { border-collapse: separate; border-spacing: 0; }
+      table.a th { font: 11px var(--mono); color: var(--muted); padding: 2px 5px; }
+      table.a td {
+        width: 60px;
+        height: 50px;
+        border: 1px solid var(--line);
+        text-align: center;
+        position: relative;
+        background: white;
+        transition: background 0.2s;
+      }
+      table.a td .o { font: 700 18px var(--mono); color: var(--off); }
+      table.a td .f {
+        position: absolute;
+        left: 4px;
+        bottom: 2px;
+        font: 650 11px var(--mono);
+        color: var(--flat);
+      }
+      table.a td.hit { background: var(--offbg); outline: 3px solid var(--off); outline-offset: -3px; }
+      table.a td.done { background: #f3f8fc; }
+      table.a.showflat td { background: white; }
+      table.a.showflat td.flatOn { background: var(--flatbg); }
+      .strip { border-collapse: separate; border-spacing: 0; }
+      .strip th {
+        font: 650 11px system-ui, sans-serif;
+        color: var(--muted);
+        text-align: right;
+        padding: 0 8px 0 0;
+        white-space: nowrap;
+      }
+      .strip td {
+        min-width: 44px;
+        height: 30px;
+        border: 1px solid var(--line);
+        text-align: center;
+        font: 12px var(--mono);
+        background: white;
+        padding: 0 4px;
+      }
+      .strip tr.k td { color: var(--off); font-weight: 700; }
+      .strip tr.rc td { color: var(--muted); font-size: 11px; }
+      .strip tr.v td { color: var(--flat); font-weight: 700; font-size: 14px; }
+      .strip td.hit { background: var(--offbg); }
+      .strip tr.v td.hit { background: var(--flatbg); }
+      .strip td.missing { background: var(--badbg); color: var(--bad); }
+      .strip-wrap { overflow-x: auto; margin-top: 18px; }
+      #r-axis { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+      .rblocks { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+      .bcap { font: 650 12px var(--mono); color: var(--muted); margin: 0 0 6px; }
+      table.a.r td .rv { font: 700 18px var(--mono); color: var(--flat); }
+      table.a.r td .ki {
+        position: absolute;
+        left: 4px;
+        bottom: 2px;
+        font: 650 11px var(--mono);
+        color: var(--off);
+      }
+      table.a.r td.filled { background: #fbf6ef; }
+      table.a.r td.hit { background: var(--flatbg); outline: 3px solid var(--flat); outline-offset: -3px; }
+      #missing { margin: 8px 0 0; color: var(--bad); font: 650 13px var(--mono); }
+      #check { margin-top: 14px; font: 12.5px var(--mono); line-height: 1.6; white-space: pre-wrap; color: var(--ink); min-height: 20px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>right_inverse, step by step</strong>
+      <small>A sends a coordinate to an offset. R = right_inverse(A) sends an offset back to A’s flat (colexicographical) coordinate.</small>
+    </header>
+
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <button id="restart">↺ Restart</button>
+      <button id="end">Skip to end</button>
+      <span class="count" id="count"></span>
+      <span class="spacer"></span>
+      <div class="cases" id="cases"></div>
+    </div>
+
+    <p id="caption"></p>
+
+    <section class="panel">
+      <div id="phase"></div>
+      <div class="key">
+        <span><b class="o">blue</b> = offset, what A returns</span>
+        <span><b class="f">orange</b> = flat coordinate, the colexicographical index of the cell in A’s shape</span>
+      </div>
+      <div class="row2">
+        <div>
+          <h3>A <code id="a-text"></code></h3>
+          <table class="a" id="a"></table>
+        </div>
+        <div id="calc"></div>
+      </div>
+      <div class="strip-wrap">
+        <h3>R = right_inverse(A) <code id="r-text"></code></h3>
+        <p id="r-axis"></p>
+        <div id="r-host"></div>
+        <p id="missing" hidden></p>
+      </div>
+      <div id="check"></div>
+    </section>
+
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        const prod = (xs) => xs.reduce((p, x) => p * x, 1);
+        const colex = (n, shape) => shape.map((s) => { const v = n % s; n = Math.floor(n / s); return v; });
+        const rAt = (cs, k) => colex(k, cs.rShape).reduce((s, v, m) => s + v * cs.rStride[m], 0);
+        const modeName = (shape, i) => {
+          if (shape.length === 1) return "column";
+          if (shape.length === 2) return i === 0 ? "row" : "column";
+          return ["block", "row", "column"][i];
+        };
+        function colexCalc(k, shape, stride) {
+          let n = k;
+          const coord = [];
+          const lines = [];
+          shape.forEach((s, i) => {
+            const v = n % s;
+            const q = Math.floor(n / s);
+            coord.push(v);
+            lines.push(`<div class="x">colex  ${n} mod ${s} = ${v}   ${modeName(shape, i)}</div>`);
+            if (i < shape.length - 1) lines.push(`<div class="x">colex  ${n} ÷ ${s} = ${q}</div>`);
+            n = q;
+          });
+          const dots = coord.map((v, i) => `${stride[i]}·${v}`).join(" + ");
+          const out = coord.reduce((sum, v, i) => sum + v * stride[i], 0);
+          const written = coord.length === 1 ? `(${coord[0]})` : `(${coord.join(", ")})`;
+          lines.push(`<div class="rv">R${written} = ${dots} = ${out}</div>`);
+          return lines.join("");
+        }
+
+        /*
+          A is drawn as rows = mode 0, columns = the remaining modes in colexicographical order.
+          shape/stride are A's modes flattened. crdText prints a coordinate in A's nesting.
+          R values printed by FlyDSL right_inverse.
+        */
+        const CASES = [
+          {
+            label: "(4,2):(2,1)",
+            aText: "(4,2):(2,1)", shape: [4, 2], stride: [2, 1],
+            crdText: (c) => `(${c[0]},${c[1]})`,
+            flatText: "i + 4·j",
+            rText: "(2,4):(4,1)", rShape: [2, 4], rStride: [4, 1],
+            cap: `<b>A compact layout that is not column-major.</b> A hits every offset 0–7, so R covers all of them. R is a different layout, <code>(2,4):(4,1)</code>.`,
+          },
+          {
+            label: "(4,(2,3)):(6,(3,1))",
+            aText: "(4,(2,3)):(6,(3,1))", shape: [4, 2, 3], stride: [6, 3, 1],
+            crdText: (c) => `(${c[0]},(${c[1]},${c[2]}))`,
+            flatText: "i + 4·j₀ + 8·j₁",
+            rText: "(3,2,4):(8,4,1)", rShape: [3, 2, 4], rStride: [8, 4, 1],
+            cap: `<b>A nested mode.</b> The columns are (2,3), read in colexicographical order, so column <code>j = j₀ + 2·j₁</code>. A hits every offset 0–23. R is <code>(3,2,4):(8,4,1)</code>: its input is the offset written in R’s own shape, and its output is A’s flat coordinate.`,
+          },
+          {
+            label: "(4,4):(1,8)",
+            aText: "(4,4):(1,8)", shape: [4, 4], stride: [1, 8],
+            crdText: (c) => `(${c[0]},${c[1]})`,
+            flatText: "i + 4·j",
+            rText: "4:1", rShape: [4], rStride: [1],
+            cap: `<b>Stops after four.</b> A outputs 0, 1, 2, 3, then jumps to 8. Offset 4 is never produced, so R stops there: <code>4:1</code>.`,
+          },
+          {
+            label: "4:2",
+            aText: "4:2", shape: [4], stride: [2],
+            crdText: (c) => `${c[0]}`,
+            flatText: "i",
+            rText: "1:0", rShape: [1], rStride: [0],
+            cap: `<b>Stops at once.</b> A outputs 0, 2, 4, 6. Offset 1 is missing, so R only covers offset 0: <code>1:0</code>.`,
+          },
+          {
+            label: "(2,3):(2,1)",
+            aText: "(2,3):(2,1)", shape: [2, 3], stride: [2, 1],
+            crdText: (c) => `(${c[0]},${c[1]})`,
+            flatText: "i + 2·j",
+            rText: "3:2", rShape: [3], rStride: [2],
+            cap: `<b>Overlap.</b> Offset = 2·i + j. The stride-1 mode covers 0, 1, 2 at (0,0), (0,1), (0,2). Stride 2 lands inside that range: (1,0) is also offset 2. R keeps the stride-1 mode and prints <code>3:2</code>.`,
+          },
+        ];
+
+        function cellsOf(cs) {
+          const total = prod(cs.shape);
+          const out = [];
+          for (let f = 0; f < total; f++) {
+            const crd = colex(f, cs.shape);
+            const off = crd.reduce((s, v, k) => s + v * cs.stride[k], 0);
+            out.push({ flat: f, crd, off, row: crd[0], col: Math.floor(f / cs.shape[0]) });
+          }
+          return out;
+        }
+
+        function framesOf(cs) {
+          const cells = cellsOf(cs);
+          const rSize = prod(cs.rShape);
+          const frames = [];
+          frames.push({
+            flat: false, filled: 0, hit: null, missing: false, check: false,
+            phase: `A maps each coordinate to an <b style="color: var(--off)">offset</b>. The blue numbers are those offsets.`,
+          });
+          frames.push({
+            flat: true, filled: 0, hit: null, missing: false, check: false,
+            phase: `Each cell also has a <b style="color: var(--flat)">flat coordinate</b>: its coordinate read in colexicographical order in A’s shape, first mode fastest. Here flat = <code>${cs.flatText}</code>. It counts 0, 1, 2, … down the first column, then the next. This is the number R returns.`,
+          });
+          for (let k = 0; k < rSize; k++) {
+            const c = cells[rAt(cs, k)];
+            frames.push({
+              flat: true, filled: k + 1, hit: c, missing: false, check: false,
+              calc: colexCalc(k, cs.rShape, cs.rStride),
+              phase: `Offset <b style="color: var(--off)">${k}</b> is at A coordinate <code>${cs.crdText(c.crd)}</code>, flat coordinate <b style="color: var(--flat)">${c.flat}</b>. R splits ${k} colexicographically in <code>(${cs.rShape.join(",")})</code>.`,
+            });
+          }
+          const nextMissing = cells.some((x) => x.off === rSize) ? null : rSize;
+          if (nextMissing !== null && rSize < cells.length) {
+            frames.push({
+              flat: true, filled: rSize, hit: null, missing: true, check: false,
+              phase: `Offset <b style="color: var(--bad)">${rSize}</b> is not in A. R covers only the offsets 0 to ${rSize - 1} that come one after another, so it stops at size ${rSize}.`,
+            });
+          }
+          frames.push({
+            flat: true, filled: rSize, hit: null, missing: false, check: true,
+            phase: `R = <code>${cs.rText}</code>. Input: an offset, split colexicographically in R’s shape. Output: A’s flat coordinate. Composed, <code>A(R(k)) = k</code> for every k R covers.`,
+          });
+          return { frames, cells, rSize };
+        }
+
+        let caseIdx = 0;
+        let step = 0;
+        let data = framesOf(CASES[0]);
+        let aCells = [];
+
+        function build(cs) {
+          $("a-text").textContent = cs.aText;
+          $("r-text").textContent = cs.rText;
+          const t = $("a");
+          t.innerHTML = "";
+          aCells = [];
+          const rows = cs.shape[0];
+          const cols = prod(cs.shape.slice(1));
+          const head = document.createElement("tr");
+          head.innerHTML = `<th></th>` + Array.from({ length: cols }, (_, j) => {
+            if (cs.shape.length > 2) {
+              const sub = colex(j, cs.shape.slice(1));
+              return `<th>j=${j}<br>(${sub.join(",")})</th>`;
+            }
+            return `<th>j=${j}</th>`;
+          }).join("");
+          if (cols > 0 && cs.shape.length > 1) t.appendChild(head);
+          for (let i = 0; i < rows; i++) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<th>i=${i}</th>`;
+            for (let j = 0; j < Math.max(cols, 1); j++) {
+              const td = document.createElement("td");
+              const cell = data.cells.find((c) => c.row === i && c.col === j);
+              td.innerHTML = `<span class="o">${cell.off}</span><span class="f"></span>`;
+              aCells.push({ td, cell });
+              tr.appendChild(td);
+            }
+            t.appendChild(tr);
+          }
+          buildR(cs);
+        }
+        let rByK = [];
+
+        function flatOf(coord, shape) {
+          let k = 0;
+          let scale = 1;
+          for (let i = 0; i < coord.length; i++) {
+            k += coord[i] * scale;
+            scale *= shape[i];
+          }
+          return k;
+        }
+
+        function rCell(coord, stride) {
+          const k = flatOf(coord, CASES[caseIdx].rShape);
+          const value = coord.reduce((sum, v, m) => sum + v * stride[m], 0);
+          const td = document.createElement("td");
+          td.innerHTML = `<span class="rv"></span><span class="ki"></span>`;
+          rByK[k] = { td, value };
+          return td;
+        }
+
+        function rGrid(rows, cols, at) {
+          const table = document.createElement("table");
+          table.className = "a r";
+          const head = document.createElement("tr");
+          head.innerHTML = `<th></th>` + Array.from({ length: cols }, (_, j) => `<th>${j}</th>`).join("");
+          table.appendChild(head);
+          for (let i = 0; i < rows; i++) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<th>${i}</th>`;
+            for (let j = 0; j < cols; j++) tr.appendChild(at(i, j));
+            table.appendChild(tr);
+          }
+          return table;
+        }
+
+        function buildR(cs) {
+          const shape = cs.rShape;
+          const stride = cs.rStride;
+          const host = $("r-host");
+          host.innerHTML = "";
+          rByK = [];
+          if (shape.length === 1) {
+            $("r-axis").textContent = `One mode of ${shape[0]}, stride ${stride[0]}. The column is that mode.`;
+            const table = document.createElement("table");
+            table.className = "a r";
+            const head = document.createElement("tr");
+            head.innerHTML = `<th></th>` + Array.from({ length: shape[0] }, (_, j) => `<th>${j}</th>`).join("");
+            table.appendChild(head);
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<th></th>`;
+            for (let j = 0; j < shape[0]; j++) tr.appendChild(rCell([j], stride));
+            table.appendChild(tr);
+            host.appendChild(table);
+          } else if (shape.length === 2) {
+            $("r-axis").textContent = `Rows are mode 0, stride ${stride[0]}. Columns are mode 1, stride ${stride[1]}.`;
+            host.appendChild(rGrid(shape[0], shape[1], (i, j) => rCell([i, j], stride)));
+          } else {
+            $("r-axis").textContent = `${shape[0]} blocks of ${shape[1]}×${shape[2]}. Columns are mode 2, stride ${stride[2]}. Rows inside a block are mode 1, stride ${stride[1]}.`;
+            const wrap = document.createElement("div");
+            wrap.className = "rblocks";
+            for (let b = 0; b < shape[0]; b++) {
+              const block = document.createElement("div");
+              const cap = document.createElement("div");
+              cap.className = "bcap";
+              cap.textContent = `mode 0 = ${b}`;
+              block.appendChild(cap);
+              block.appendChild(rGrid(shape[1], shape[2], (i, j) => rCell([b, i, j], stride)));
+              wrap.appendChild(block);
+            }
+            host.appendChild(wrap);
+          }
+        }
+
+        function show() {
+          const cs = CASES[caseIdx];
+          const f = data.frames[step];
+          $("a").classList.toggle("showflat", f.flat);
+          const chosen = new Set(Array.from({ length: f.filled }, (_, k) => rAt(cs, k)));
+          aCells.forEach(({ td, cell }) => {
+            td.querySelector(".f").textContent = f.flat ? `f ${cell.flat}` : "";
+            td.classList.remove("hit", "done", "flatOn");
+            if (chosen.has(cell.flat)) td.classList.add("flatOn");
+            if (f.hit && cell === f.hit) td.classList.add("hit");
+          });
+          rByK.forEach(({ td, value }, k) => {
+            const filled = k < f.filled;
+            const isHit = f.hit && k === f.filled - 1;
+            td.querySelector(".rv").textContent = filled ? value : "";
+            td.querySelector(".ki").textContent = filled ? `k ${k}` : "";
+            td.classList.toggle("filled", filled && !isHit);
+            td.classList.toggle("hit", !!isHit);
+          });
+          $("missing").hidden = !f.missing;
+          $("missing").textContent = f.missing ? `Offset ${data.rSize} is not a coordinate of R.` : "";
+          $("check").textContent = f.check
+            ? Array.from({ length: data.rSize }, (_, k) => {
+                const rc = colex(k, cs.rShape);
+                const rv = rc.reduce((s, v, m) => s + v * cs.rStride[m], 0);
+                const c = data.cells[rv];
+                return `R(${k}) = ${rv}   A${cs.crdText(c.crd)} = ${c.off}`;
+              }).join("\n")
+            : "";
+          $("caption").innerHTML = cs.cap;
+          $("phase").innerHTML = f.phase;
+          $("calc").innerHTML = f.calc || "";
+          $("count").textContent = `step ${step + 1} / ${data.frames.length}`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === data.frames.length - 1;
+          caseButtons.forEach((b, i) => b.classList.toggle("on", i === caseIdx));
+        }
+
+        function pick(i) {
+          caseIdx = i;
+          step = 0;
+          data = framesOf(CASES[i]);
+          build(CASES[i]);
+          show();
+        }
+
+        const caseButtons = CASES.map((cs, i) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = cs.label;
+          b.addEventListener("click", () => pick(i));
+          $("cases").appendChild(b);
+          return b;
+        });
+
+        const go = (d) => { step = Math.max(0, Math.min(data.frames.length - 1, step + d)); show(); };
+        $("next").addEventListener("click", () => go(1));
+        $("prev").addEventListener("click", () => go(-1));
+        $("restart").addEventListener("click", () => { step = 0; show(); });
+        $("end").addEventListener("click", () => { step = data.frames.length - 1; show(); });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") go(1);
+          else if (e.key === "ArrowLeft") go(-1);
+        });
+        pick(0);
+      })();
+    </script>
+  </body>
+</html>

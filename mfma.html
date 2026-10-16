@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MFMA</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body { display: flex; flex-direction: column; }
+      header {
+        padding: 12px 20px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      header strong { font-size: 18px; }
+      .cases { display: flex; gap: 8px; flex-wrap: wrap; }
+      button {
+        font: inherit;
+        font-size: 15px;
+        color: inherit;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button.on {
+        border-color: var(--accent);
+        background: #e9f3ee;
+        color: var(--accent);
+        font-weight: 650;
+      }
+      iframe { flex: 1; width: 100%; border: 0; background: white; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="presentation/">Tile abstraction</a>
+      <strong>MFMA</strong>
+      <div class="cases" id="cases">
+        <button type="button" data-src="mfma-a-layout-animation.html">A · 16×16</button>
+        <button type="button" data-src="mfma-b-layout-animation.html">B · 16×16</button>
+        <button type="button" data-src="mfma-c-layout-animation.html">C · 16×16</button>
+        <button type="button" data-src="mfma-c32-layout.html">C · 32×32</button>
+      </div>
+    </header>
+    <iframe id="frame" title="MFMA layout"></iframe>
+    <script>
+      (() => {
+        const frame = document.getElementById("frame");
+        const buttons = [...document.querySelectorAll("#cases button")];
+        function show(src) {
+          buttons.forEach((b) => b.classList.toggle("on", b.dataset.src === src));
+          frame.src = `${src}?v=${Date.now()}`;
+        }
+        frame.addEventListener("load", () => {
+          const nav = frame.contentDocument && frame.contentDocument.querySelector(".switch");
+          if (nav) nav.style.display = "none";
+        });
+        buttons.forEach((b) => b.addEventListener("click", () => show(b.dataset.src)));
+        show(buttons[0].dataset.src);
+      })();
+    </script>
+  </body>
+</html>

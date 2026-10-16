@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MFMA C · 32×32 f32 · value (4,4)</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --g0: #cfe3f7;
+        --g0s: #3c7bbf;
+        --g1: #f6dcc0;
+        --g1s: #c47b2b;
+        --g2: #cfeedd;
+        --g2s: #2f8a5c;
+        --g3: #e6d6f2;
+        --g3s: #7d4fae;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      code { font-family: var(--mono); }
+      header {
+        padding: 10px 16px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      header strong { font-size: 15px; }
+      header small { color: var(--muted); font-size: 12px; }
+      .switch { margin-left: auto; display: flex; gap: 6px; }
+      .switch a {
+        text-decoration: none;
+        color: var(--ink);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 650;
+        background: white;
+      }
+      .switch a.on { border-color: var(--accent); background: #e9f3ee; color: var(--accent); }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px 0;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: inherit;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.on, button.quiz.on {
+        border-color: var(--accent);
+        background: #e9f3ee;
+        color: var(--accent);
+        font-weight: 650;
+      }
+      button.quiz { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+      .dots { display: flex; gap: 6px; margin: 0 6px; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); cursor: pointer; }
+      .dot.on { background: var(--accent); }
+      .spacer { flex: 1; }
+      .count { font-size: 12px; color: var(--muted); min-width: 64px; }
+      #problem, #caption {
+        margin: 10px 16px 0;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.55;
+        min-height: 50px;
+      }
+      #readout {
+        margin: 6px 16px 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+        min-height: 20px;
+      }
+      #readout b { color: var(--ink); }
+      #fit { padding: 12px 16px 16px; overflow: hidden; }
+      #stage {
+        display: flex;
+        gap: 26px;
+        align-items: flex-start;
+        transform-origin: top left;
+        width: max-content;
+      }
+      .panel {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px 12px;
+      }
+      .panel h2 { font-size: 13px; margin: 0 0 2px; }
+      .panel .sub { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
+      table { border-collapse: collapse; }
+
+      #A td, #A th {
+        width: 26px;
+        height: 16px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 8px;
+        border: 1px solid var(--line);
+        padding: 0;
+      }
+      #A th { color: var(--muted); font-weight: 600; background: #f7fbf8; }
+      #A td { background: #fbfdfc; cursor: pointer; }
+      #A .band th { height: 18px; border: none; background: none; font-size: 10px; text-align: left; }
+      #A .band th span {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 5px;
+        border: 1px solid transparent;
+      }
+
+      #right { transition: opacity 0.5s; opacity: 0; }
+      #stage.show-lanes #right { opacity: 1; }
+      #R th, #R td {
+        height: 16px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 8px;
+        border: 1px solid var(--line);
+        padding: 0 2px;
+      }
+      #R th.lane {
+        width: 36px;
+        font-family: system-ui, sans-serif;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--muted);
+        background: #f7fbf8;
+        cursor: pointer;
+      }
+      #R th.vgpr, #R td.vgpr {
+        width: 48px;
+        opacity: 0;
+        transition: opacity 0.5s;
+      }
+      #R td.vgpr { white-space: nowrap; }
+      #R th.vgpr {
+        height: auto;
+        line-height: 1.15;
+        padding: 2px 1px;
+        font-size: 8px;
+      }
+      #stage.show-vgprs #R th.vgpr,
+      #stage.show-vgprs #R td.vgpr { opacity: 1; }
+      #R td.vgpr { background: #fbfdfc; cursor: pointer; }
+      #R th.vgpr, #R th.v1 {
+        font-family: system-ui, sans-serif;
+        font-size: 9px;
+        font-weight: 650;
+        color: var(--muted);
+        background: #f7fbf8;
+      }
+      #R th.v1 { border: none; background: none; height: 18px; }
+      #R tr.gstart th, #R tr.gstart td { border-top: 2px solid #b9cdc3; }
+      #R tr.band th {
+        height: 18px;
+        border: none;
+        background: none;
+        text-align: left;
+        font-family: system-ui, sans-serif;
+        font-size: 10px;
+        font-weight: 650;
+        color: var(--ink);
+      }
+      .g0 { background: var(--g0) !important; }
+      .g1 { background: var(--g1) !important; }
+      .g2 { background: var(--g2) !important; }
+      .g3 { background: var(--g3) !important; }
+      .band span.b0 { background: var(--g0); border-color: var(--g0s); }
+      .band span.b1 { background: var(--g1); border-color: var(--g1s); }
+      .band span.b2 { background: var(--g2); border-color: var(--g2s); }
+      .band span.b3 { background: var(--g3); border-color: var(--g3s); }
+      #A td.act0, #R td.act0 { box-shadow: inset 0 0 0 1px var(--g0s); }
+      #A td.act1, #R td.act1 { box-shadow: inset 0 0 0 1px var(--g1s); }
+      #A td.act2, #R td.act2 { box-shadow: inset 0 0 0 1px var(--g2s); }
+      #A td.act3, #R td.act3 { box-shadow: inset 0 0 0 1px var(--g3s); }
+      .sel {
+        box-shadow: inset 0 0 0 2px var(--accent) !important;
+        font-weight: 800;
+        color: #0b3d34;
+      }
+      #hip {
+        margin: 8px 16px 16px;
+        padding: 10px 14px 12px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      #hip h2 { font-size: 13px; margin: 0 0 4px; }
+      #hip p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink); }
+      #hip p + p { margin-top: 4px; color: var(--muted); }
+      .hip-math {
+        margin-top: 8px;
+        padding: 8px 10px;
+        background: #f7fbf8;
+        border-radius: 8px;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+      }
+
+      .fly {
+        position: fixed;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--mono);
+        font-size: 8px;
+        border-radius: 3px;
+        border: 1px solid;
+        pointer-events: none;
+        transition: transform 0.7s cubic-bezier(0.5, 0, 0.3, 1), width 0.7s, height 0.7s;
+      }
+      .fly.g0 { border-color: var(--g0s); }
+      .fly.g1 { border-color: var(--g1s); }
+      .fly.g2 { border-color: var(--g2s); }
+      .fly.g3 { border-color: var(--g3s); }
+
+      .main { display: flex; gap: 16px; align-items: flex-start; padding-right: 16px; }
+      .main #fit { flex: 1; min-width: 0; }
+      #side { flex: none; width: 420px; padding-top: 12px; }
+      #side #caption, #side #readout, #side #hip { margin: 0 0 10px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>MFMA C · 32×32 f32</strong>
+      <small>How the 16 VGPRs of one 32×32 accumulator are addressed. Same C layout for <code>MFMA(32, 32, 8, f16)</code> and <code>MFMA(32, 32, 16, f16)</code>.</small>
+      <button id="show-layout" class="quiz" type="button">Show layout</button>
+      <small id="layout-answer" hidden><code>layout_C_tv ((32,2),(4,4)):((32,4),(1,8))</code></small>
+      <nav class="switch">
+        <a href="mfma-c-layout-animation.html">16×16 C</a>
+        <a class="on" href="mfma-c32-layout.html">32×32 C</a>
+      </nav>
+    </header>
+
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <button id="play">▶ Play</button>
+      <button id="restart">Restart</button>
+      <div class="dots" id="dots"></div>
+      <span class="count" id="count"></span>
+      <span class="spacer"></span>
+      <span class="count">number in a cell</span>
+      <button id="num-col" class="on">m + 32·n</button>
+      <button id="num-row">32·m + n</button>
+    </div>
+
+    <p id="problem"><b>The problem.</b> One MFMA writes a 32×32 tile of C, the f32 accumulator: 32 rows of M by 32 columns of N, 1024 values.</p>
+
+    <div class="main">
+    <div id="fit">
+      <div id="stage">
+        <section class="panel" id="left">
+          <h2>C tile · 32 × 32 f32</h2>
+          <p class="sub">rows are M, columns are N</p>
+          <table id="A"></table>
+        </section>
+        <section class="panel" id="right">
+          <h2>One wave · 64 lanes · 16 VGPRs</h2>
+          <p class="sub" id="right-sub">each row is one lane</p>
+          <table id="R"></table>
+        </section>
+      </div>
+    </div>
+
+    <aside id="side">
+    <p id="caption"></p>
+    <p id="readout"></p>
+    <section id="hip">
+      <h2>HIP address · same rule as <code>load_C_16x16_col_major</code></h2>
+      <div class="hip-math">n  = threadIdx.x % 32         // the column N this lane owns
+t1 = threadIdx.x / 32         // 0 for lanes 0–31, 1 for lanes 32–63
+
+for (v1 = 0; v1 &lt; 4; v1++) {  // v1 = which dwordx4 load; loads are 8 rows apart
+  row  = 8*v1 + 4*t1          // first row of this load
+  addr = row + n*ldc          // column-major, ldc = 32
+  for (v0 = 0; v0 &lt; 4; v0++)  // v0 = which of the 4 adjacent rows in this load
+    VGPR[4*v1 + v0] = c[addr + v0];
+}</div>
+    </section>
+    </aside>
+    </div>
+
+    <script>
+      (() => {
+        const N = 32;
+        const LANES = 64;
+        const $ = (id) => document.getElementById(id);
+        const stage = $("stage");
+        const fitEl = $("fit");
+
+        let order = "col";
+        const val = (m, n) => (order === "col" ? m + 32 * n : 32 * m + n);
+        const parts = (m) => ({ v1: m >> 3, t1: (m >> 2) & 1, v0: m & 3 });
+
+        const aCell = [];
+        const aBand = [];
+        const slotCell = Array.from({ length: 16 }, () => []);
+        const laneHead = [];
+
+        {
+          const t = $("A");
+          const head = document.createElement("tr");
+          head.appendChild(document.createElement("th"));
+          for (let n = 0; n < N; n++) {
+            const th = document.createElement("th");
+            th.textContent = n;
+            head.appendChild(th);
+          }
+          t.appendChild(head);
+          for (let m = 0; m < N; m++) {
+            if (m % 8 === 0) {
+              const band = document.createElement("tr");
+              band.className = "band";
+              const th = document.createElement("th");
+              th.colSpan = 33;
+              th.innerHTML = `<span>v1=${m / 8} · M${m}–M${m + 7}</span>`;
+              band.appendChild(th);
+              t.appendChild(band);
+              aBand.push(th);
+            }
+            const tr = document.createElement("tr");
+            const th = document.createElement("th");
+            th.textContent = m;
+            tr.appendChild(th);
+            aCell.push([]);
+            for (let n = 0; n < N; n++) {
+              const td = document.createElement("td");
+              td.addEventListener("click", () => selectC(m, n));
+              tr.appendChild(td);
+              aCell[m].push(td);
+            }
+            t.appendChild(tr);
+          }
+        }
+
+        {
+          const t = $("R");
+          const h1 = document.createElement("tr");
+          const corner = document.createElement("th");
+          corner.className = "lane";
+          corner.rowSpan = 2;
+          corner.textContent = "lane";
+          h1.appendChild(corner);
+          for (let v1 = 0; v1 < 4; v1++) {
+            const th = document.createElement("th");
+            th.className = "vgpr v1";
+            th.colSpan = 4;
+            th.textContent = `v1=${v1} · VGPR ${4 * v1}–${4 * v1 + 3}`;
+            h1.appendChild(th);
+          }
+          t.appendChild(h1);
+          const h2 = document.createElement("tr");
+          for (let s = 0; s < 16; s++) {
+            const th = document.createElement("th");
+            th.className = "vgpr";
+            th.innerHTML = `VGPR ${s}<br>v0=${s & 3} · v1=${s >> 2}`;
+            h2.appendChild(th);
+          }
+          t.appendChild(h2);
+
+          for (let l = 0; l < LANES; l++) {
+            if (l % 32 === 0) {
+              const band = document.createElement("tr");
+              band.className = "band";
+              const th = document.createElement("th");
+              th.colSpan = 17;
+              th.textContent = l === 0
+                ? "lanes 0–31 · t1 = 0 · the first 4 rows of each block of 8"
+                : "lanes 32–63 · t1 = 1 · the next 4 rows of each block of 8";
+              band.appendChild(th);
+              t.appendChild(band);
+            }
+            const tr = document.createElement("tr");
+            if (l % 32 === 0) tr.className = "gstart";
+            const th = document.createElement("th");
+            th.className = "lane";
+            th.textContent = l;
+            th.addEventListener("click", () => selectLane(l));
+            tr.appendChild(th);
+            laneHead.push(th);
+            for (let s = 0; s < 16; s++) {
+              const td = document.createElement("td");
+              td.className = "vgpr";
+              td.addEventListener("click", () => selectSlot(s, l));
+              tr.appendChild(td);
+              slotCell[s].push(td);
+            }
+            t.appendChild(tr);
+          }
+        }
+
+        const STEPS = [
+          {
+            lanes: false, vgprs: false, filled: -1, active: -1,
+            cap: () =>
+              (order === "col"
+                ? `Each cell shows <code>m + 32·n</code>, the number <code>layout_C_tv</code> returns.`
+                : `Each cell shows <code>32·m + n</code>, counting along the rows.`) +
+              (layoutShown ? ` Printed <code>layout_C_tv ((32,2),(4,4)):((32,4),(1,8))</code>.` : ``),
+          },
+          {
+            lanes: true, vgprs: false, filled: -1, active: -1,
+            cap: () =>
+              `<b>64 lanes, split in two.</b> <code>t0 = lane mod 32</code> is the column N. <code>t1 = lane ÷ 32</code> is 0 for lanes 0–31 and 1 for lanes 32–63. On 16×16 that second thread mode had shape 4. Here N is 32, so it only has shape 2.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: -1, active: -1,
+            cap: () =>
+              `<b>Sixteen f32 VGPRs.</b> One column per register, VGPR 0 through VGPR 15. The layout addresses them as <code>(v0, v1)</code>, and the register number is <code>v0 + 4·v1</code>. <code>v0</code> is four adjacent rows. <code>v1</code> repeats that pattern every 8 rows, which is why the columns come in four groups.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 0, active: 0,
+            cap: () =>
+              `<b>v1 = 0, the first 8 rows.</b> Lanes 0–31 take M0–M3, one column each, in v0 order. Lanes 32–63 take M4–M7 of the same columns. Those two fours are what <code>t1</code> selects. The layout term is <code>4·t1 + v0</code>.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 1, active: 1,
+            cap: () =>
+              `<b>v1 = 1, rows M8–M15.</b> Same lanes, same v0 order, eight rows lower. That distance is the v1 stride: <code>8·v1</code>. These are VGPR 4–7.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 2, active: 2,
+            cap: () => `<b>v1 = 2, rows M16–M23.</b> VGPR 8–11. The block of 8 starts at row <code>8·2 = 16</code>.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 3, active: 3,
+            cap: () => `<b>v1 = 3, rows M24–M31.</b> VGPR 12–15. Every cell now has a lane and one of the 16 VGPRs.`,
+          },
+          {
+            lanes: true, vgprs: true, filled: 3, active: -1,
+            cap: () =>
+              `<b>So m = 8·v1 + 4·t1 + v0, and n = lane mod 32.</b> ` +
+              (layoutShown ? `<code>layout_C_tv((n, t1), (v0, v1))</code> = <code>32·n + 4·t1 + v0 + 8·v1</code> = <code>m + 32·n</code>. On the 16×16 atom the same builder emits <code>(4,1):(1,16)</code>: v1’s shape is 1, so the <code>8·v1</code> term never moves.` : ``),
+          },
+        ];
+
+        let layoutShown = false;
+        let lastPick = null;
+        let step = 0;
+        let filled = -1;
+        let flyToken = 0;
+        let playing = false;
+        let playTimer = null;
+        const dotsEl = $("dots");
+        STEPS.forEach((_, i) => {
+          const d = document.createElement("span");
+          d.className = "dot";
+          d.addEventListener("click", () => { stopPlay(); go(i, false); });
+          dotsEl.appendChild(d);
+        });
+
+        function cancelFlights() {
+          flyToken++;
+          document.querySelectorAll(".fly").forEach((d) => d.remove());
+        }
+
+        function fillOne(n, v0, v1) {
+          for (let t1 = 0; t1 < 2; t1++) {
+            const m = 8 * v1 + 4 * t1 + v0;
+            const lane = n + 32 * t1;
+            const slot = v0 + 4 * v1;
+            const td = slotCell[slot][lane];
+            td.textContent = val(m, n);
+            td.className = "vgpr g" + v1;
+          }
+        }
+
+        function fillGroup(v1) {
+          for (let n = 0; n < N; n++) for (let v0 = 0; v0 < 4; v0++) fillOne(n, v0, v1);
+          aBand[v1].querySelector("span").className = "b" + v1;
+        }
+
+        function clearRight() {
+          for (let s = 0; s < 16; s++)
+            for (let l = 0; l < LANES; l++) {
+              slotCell[s][l].textContent = "";
+              slotCell[s][l].className = "vgpr";
+            }
+          laneHead.forEach((th) => (th.className = "lane"));
+          aBand.forEach((th) => (th.querySelector("span").className = ""));
+        }
+
+        function paintA(upTo, active) {
+          for (let m = 0; m < N; m++)
+            for (let n = 0; n < N; n++) {
+              const v1 = m >> 3;
+              const td = aCell[m][n];
+              td.textContent = val(m, n);
+              td.className = "";
+              if (v1 <= upTo || v1 === active) td.classList.add("g" + v1);
+              if (v1 === active) td.classList.add("act" + v1);
+            }
+          aBand.forEach((th, v1) => {
+            const sp = th.querySelector("span");
+            sp.className = v1 <= upTo || v1 === active ? "b" + v1 : "";
+            sp.textContent = v1 === active
+              ? `v1=${v1} · M${8 * v1}–M${8 * v1 + 3} → lanes 0–31 · M${8 * v1 + 4}–M${8 * v1 + 7} → lanes 32–63`
+              : `v1=${v1} · M${8 * v1}–M${8 * v1 + 7}`;
+          });
+        }
+
+        function fly(v1) {
+          const token = flyToken;
+          let pending = 0;
+          for (let n = 0; n < N; n++)
+            for (let v0 = 0; v0 < 4; v0++)
+              for (let t1 = 0; t1 < 2; t1++) {
+                const m = 8 * v1 + 4 * t1 + v0;
+                const lane = n + 32 * t1;
+                const slot = v0 + 4 * v1;
+                const src = aCell[m][n].getBoundingClientRect();
+                const dst = slotCell[slot][lane].getBoundingClientRect();
+                const d = document.createElement("div");
+                d.className = "fly g" + v1;
+                d.textContent = val(m, n);
+                Object.assign(d.style, {
+                  left: src.left + "px",
+                  top: src.top + "px",
+                  width: src.width + "px",
+                  height: src.height + "px",
+                });
+                document.body.appendChild(d);
+                pending++;
+                const delay = n * 8 + v0 * 70 + t1 * 30;
+                setTimeout(() => {
+                  if (token !== flyToken) return;
+                  d.style.transform = `translate(${dst.left - src.left}px, ${dst.top - src.top}px)`;
+                  d.style.width = dst.width + "px";
+                  d.style.height = dst.height + "px";
+                }, delay + 20);
+                setTimeout(() => {
+                  if (token !== flyToken) return;
+                  d.remove();
+                  const td = slotCell[slot][lane];
+                  td.textContent = val(m, n);
+                  td.className = "vgpr g" + v1;
+                  if (--pending === 0) {
+                    fillGroup(v1);
+                    filled = v1;
+                  }
+                }, delay + 20 + 740);
+              }
+        }
+
+        function go(i, animate) {
+          cancelFlights();
+          clearSel();
+          lastPick = null;
+          step = Math.max(0, Math.min(STEPS.length - 1, i));
+          const st = STEPS[step];
+          stage.classList.toggle("show-lanes", st.lanes);
+          stage.classList.toggle("show-vgprs", st.vgprs);
+          $("right-sub").textContent = st.vgprs
+            ? "16 f32 VGPRs · VGPR = v0 + 4·v1"
+            : "each row is one lane · t0 = column, t1 = which half";
+
+          const anim = animate && st.active >= 0 ? st.active : -1;
+          const upTo = anim >= 0 ? anim - 1 : st.filled;
+          clearRight();
+          for (let g = 0; g <= upTo; g++) fillGroup(g);
+          filled = upTo;
+          paintA(upTo, st.active);
+          if (anim >= 0) requestAnimationFrame(() => fly(anim));
+
+          $("caption").innerHTML = st.cap();
+          $("readout").innerHTML = st.filled >= 0 ? "Click a cell, a value, or a lane." : "";
+          [...dotsEl.children].forEach((d, j) => d.classList.toggle("on", j === step));
+          $("count").textContent = `step ${step + 1} / ${STEPS.length}`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === STEPS.length - 1;
+        }
+
+        function clearSel() {
+          document.querySelectorAll(".sel").forEach((e) => e.classList.remove("sel"));
+        }
+
+        function selectC(m, n) {
+          const { v1, t1, v0 } = parts(m);
+          if (v1 > filled) return;
+          lastPick = () => selectC(m, n);
+          clearSel();
+          const lane = n + 32 * t1;
+          const slot = v0 + 4 * v1;
+          aCell[m][n].classList.add("sel");
+          slotCell[slot][lane].classList.add("sel");
+          laneHead[lane].classList.add("sel");
+          $("readout").innerHTML =
+            `<b>C[${m}][${n}]</b> holds <b>${val(m, n)}</b>. ` +
+            `n = ${n}, t1 = (m÷4) mod 2 = ${t1}, v0 = m mod 4 = ${v0}, v1 = m÷8 = ${v1}. ` +
+            `Lane = n + 32·t1 = <b>${lane}</b>. VGPR = v0 + 4·v1 = <b>${slot}</b>. ` +
+            (layoutShown ? `<code>layout_C_tv((${n}, ${t1}), (${v0}, ${v1}))</code> = 32·${n} + 4·${t1} + ${v0} + 8·${v1} = <b>${m + 32 * n}</b>.` : ``);
+        }
+
+        function selectSlot(slot, lane) {
+          const v1 = slot >> 2;
+          if (v1 > filled) return;
+          const v0 = slot & 3;
+          const t1 = lane >> 5;
+          const n = lane & 31;
+          selectC(8 * v1 + 4 * t1 + v0, n);
+        }
+
+        function selectLane(lane) {
+          const t1 = lane >> 5;
+          if (filled < 0) return;
+          lastPick = () => selectLane(lane);
+          clearSel();
+          const n = lane & 31;
+          laneHead[lane].classList.add("sel");
+          const shown = [];
+          for (let v1 = 0; v1 <= filled; v1++)
+            for (let v0 = 0; v0 < 4; v0++) {
+              const m = 8 * v1 + 4 * t1 + v0;
+              aCell[m][n].classList.add("sel");
+              slotCell[v0 + 4 * v1][lane].classList.add("sel");
+              shown.push(`${v1},${v0}→M${m}`);
+            }
+          $("readout").innerHTML =
+            `<b>Lane ${lane}</b> holds column <b>N${n}</b>, t1 = ${t1}. ` +
+            `Its values, as (v1, v0) → row: ${shown.join(", ")}.`;
+        }
+
+        function stopPlay() {
+          playing = false;
+          clearTimeout(playTimer);
+          $("play").textContent = "▶ Play";
+          $("play").classList.remove("on");
+        }
+        function playTick() {
+          if (!playing) return;
+          if (step >= STEPS.length - 1) { stopPlay(); return; }
+          go(step + 1, true);
+          playTimer = setTimeout(playTick, STEPS[step].active >= 0 ? 2800 : 2400);
+        }
+        $("next").addEventListener("click", () => { stopPlay(); go(step + 1, true); });
+        $("prev").addEventListener("click", () => { stopPlay(); go(step - 1, false); });
+        $("restart").addEventListener("click", () => { stopPlay(); go(0, false); });
+        $("play").addEventListener("click", () => {
+          if (playing) { stopPlay(); return; }
+          playing = true;
+          $("play").textContent = "❚❚ Pause";
+          $("play").classList.add("on");
+          if (step >= STEPS.length - 1) go(0, false);
+          playTimer = setTimeout(playTick, 900);
+        });
+        function setOrder(o) {
+          order = o;
+          $("num-col").classList.toggle("on", o === "col");
+          $("num-row").classList.toggle("on", o === "row");
+          go(step, false);
+        }
+        $("show-layout").addEventListener("click", () => {
+          layoutShown = !layoutShown;
+          $("layout-answer").hidden = !layoutShown;
+          $("show-layout").textContent = layoutShown ? "Hide layout" : "Show layout";
+          $("show-layout").classList.toggle("on", layoutShown);
+          $("caption").innerHTML = STEPS[step].cap();
+          if (lastPick) lastPick();
+        });
+        $("num-col").addEventListener("click", () => setOrder("col"));
+        $("num-row").addEventListener("click", () => setOrder("row"));
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") { stopPlay(); go(step + 1, true); }
+          else if (e.key === "ArrowLeft") { stopPlay(); go(step - 1, false); }
+          else if (e.key === " ") { e.preventDefault(); $("play").click(); }
+        });
+
+        function fit() {
+          cancelFlights();
+          stage.style.transform = "none";
+          const w = stage.scrollWidth;
+          const h = stage.scrollHeight;
+          const s = Math.min(1, (fitEl.clientWidth - 32) / w);
+          stage.style.transform = `scale(${s})`;
+          fitEl.style.height = h * s + 28 + "px";
+        }
+        window.addEventListener("resize", () => { fit(); go(step, false); });
+        go(0, false);
+        fit();
+      })();
+    </script>
+  </body>
+</html>

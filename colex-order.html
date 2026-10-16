@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Colexicographical order · and why composition needs it</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --g0: #cfe3f7;
+        --g0s: #3c7bbf;
+        --g1: #f6dcc0;
+        --g1s: #c47b2b;
+        --g2: #cfeedd;
+        --g2s: #2f8a5c;
+        --bad: #fbe3e1;
+        --bads: #b9443a;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      code { font-family: var(--mono); }
+      header {
+        padding: 10px 16px;
+        background: white;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      header strong { font-size: 15px; }
+      header small { color: var(--muted); font-size: 12px; }
+      .switch { margin-left: auto; display: flex; gap: 6px; }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px 0;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: inherit;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.on {
+        border-color: var(--accent);
+        background: #e9f3ee;
+        color: var(--accent);
+        font-weight: 650;
+      }
+      .cases { display: flex; gap: 6px; flex-wrap: wrap; }
+      .dots { display: flex; gap: 6px; margin: 0 6px; align-items: center; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); cursor: pointer; }
+      .dot.on { background: var(--accent); }
+      .dots .sep { width: 1px; height: 14px; background: var(--line); margin: 0 4px; }
+      .count { font-size: 12px; color: var(--muted); min-width: 64px; }
+      #caption {
+        margin: 10px 16px 0;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.6;
+        min-height: 76px;
+      }
+      .panel {
+        margin: 12px 16px 16px;
+        padding: 16px 18px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .panel h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 650; }
+
+      /* part 1: counter */
+      #counter { display: flex; gap: 34px; align-items: flex-start; flex-wrap: wrap; }
+      #digits { display: flex; gap: 10px; }
+      .digit {
+        width: 74px;
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        text-align: center;
+        padding: 6px 0 8px;
+        background: white;
+        transition: background 0.2s, border-color 0.2s;
+      }
+      .digit .d { font: 700 40px var(--mono); line-height: 1.2; }
+      .digit .lab { font-size: 11px; color: var(--muted); }
+      .digit .pv { font: 650 13px var(--mono); color: var(--accent); }
+      .digit.fast { border-color: var(--g1s); }
+      .digit.chg { background: var(--g1); }
+      .digit.carry { background: var(--g0); }
+      #dir { margin-top: 8px; font-size: 13px; color: var(--muted); min-height: 20px; }
+      #dir b { color: var(--g1s); }
+      #nbox { min-width: 260px; }
+      #nbig { font: 700 40px var(--mono); }
+      #nform { font: 13px var(--mono); color: var(--muted); margin-top: 4px; min-height: 20px; }
+      #trail {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-height: 64px;
+        align-content: flex-start;
+      }
+      .chip {
+        font: 12px var(--mono);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 3px 7px;
+        background: #f7fbf8;
+      }
+      .chip b { color: var(--accent); }
+      .chip.now { border-color: var(--g1s); background: var(--g1); }
+
+      /* part 2: pipeline */
+      #formula {
+        margin: 0 0 16px;
+        font: 700 40px var(--mono);
+        letter-spacing: -0.6px;
+      }
+      #pipe-wrap { overflow-x: auto; }
+      #pipe {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        width: max-content;
+        padding: 8px 4px 12px;
+      }
+      .node {
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 12px;
+        text-align: center;
+        background: white;
+        min-width: 110px;
+        transition: border-color 0.2s, background 0.2s, opacity 0.3s;
+      }
+      .node .t { font-size: 12px; color: var(--muted); font-weight: 650; }
+      .node .c { font: 12px var(--mono); margin-top: 2px; }
+      .node .m { font: 12px var(--mono); color: var(--accent); margin-top: 6px; min-height: 18px; white-space: pre; }
+      .node.hot { border-color: var(--accent); background: #e9f3ee; }
+      .node.bad { border-color: var(--bads); background: var(--bad); animation: shake 0.4s; }
+      .node.off { visibility: hidden; }
+      .slot {
+        display: inline-block;
+        min-width: 56px;
+        height: 40px;
+        line-height: 36px;
+        margin-top: 6px;
+        border: 2px dashed var(--line);
+        border-radius: 8px;
+        font: 700 20px var(--mono);
+        padding: 0 6px;
+      }
+      .slot.full { border-style: solid; border-color: var(--accent); }
+      .slots { display: flex; gap: 6px; justify-content: center; }
+      .slots .slot { min-width: 40px; }
+      .slots .cap { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+      .arrow { color: var(--muted); font-size: 20px; }
+      .token {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        font: 700 20px var(--mono);
+        background: var(--g1);
+        border: 2px solid var(--g1s);
+        border-radius: 8px;
+        padding: 3px 10px;
+        transition: left 0.7s ease-in-out, top 0.7s ease-in-out;
+        z-index: 5;
+        pointer-events: none;
+      }
+      .token.bad { background: var(--bad); border-color: var(--bads); }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+      }
+      #err {
+        margin-top: 10px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: var(--bad);
+        border: 1px solid var(--bads);
+        font: 12px var(--mono);
+        color: #7a2620;
+        white-space: pre-wrap;
+      }
+      #contract {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #f7fbf8;
+        border: 1px solid var(--line);
+        font: 12.5px var(--mono);
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+      .grids { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; margin-top: 16px; }
+      .viz { font-size: 12px; color: var(--muted); }
+      .viz .vh { font-weight: 650; color: var(--ink); margin-bottom: 2px; }
+      .viz .vh code { font-weight: 500; color: var(--muted); }
+      .viz .vs { margin-bottom: 4px; }
+      .viz table { border-collapse: collapse; }
+      .viz td {
+        width: 32px;
+        height: 22px;
+        text-align: center;
+        border: 1px solid var(--line);
+        font: 11px var(--mono);
+        color: var(--ink);
+      }
+      .viz td.pick { cursor: pointer; }
+      .viz td.pick:hover { background: #e9f3ee; }
+      .viz td.sel { background: var(--g1); border-color: var(--g1s); font-weight: 700; }
+      .viz th { font: 11px var(--mono); color: var(--muted); padding: 0 4px; }
+      #a-slabs { display: flex; gap: 10px; }
+      .slab-cap { font: 11px var(--mono); margin-bottom: 2px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Colexicographical order</strong>
+      <small>How one number becomes a coordinate, and why composition needs a fixed rule for it.</small>
+      <div class="switch">
+        <button id="tab1" class="on">1 · Colexicographical order</button>
+        <button id="tab2">2 · Why composition needs it</button>
+      </div>
+    </header>
+
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <button id="replay">↻ Replay</button>
+      <span class="count" id="count"></span>
+      <div class="cases" id="cases"></div>
+      <div class="dots" id="dots" hidden></div>
+    </div>
+
+    <p id="caption"></p>
+
+    <section class="panel" id="part1">
+      <h2 id="p1-title"></h2>
+      <div id="counter">
+        <div>
+          <div id="digits"></div>
+          <div id="dir"></div>
+        </div>
+        <div id="nbox">
+          <div class="lab" style="font-size: 12px; color: var(--muted)">the one number</div>
+          <div id="nbig">0</div>
+          <div id="nform"></div>
+        </div>
+      </div>
+      <div id="trail"></div>
+    </section>
+
+    <section class="panel" id="part2" hidden>
+      <div id="formula">composition(A, B) = A ∘ B</div>
+      <h2 id="p2-title">B outputs one number · A takes a coordinate with three parts</h2>
+      <div id="pipe-wrap">
+        <div id="pipe">
+          <div class="node" id="n-in">
+            <div class="t">input</div>
+            <div class="slot" id="s-in"></div>
+          </div>
+          <span class="arrow">→</span>
+          <div class="node" id="n-B">
+            <div class="t">layout B</div>
+            <div class="c">(4,6):(6,1)</div>
+            <div class="m" id="m-B"></div>
+          </div>
+          <span class="arrow">→</span>
+          <div class="node" id="n-off">
+            <div class="t">offset</div>
+            <div class="slot" id="s-off"></div>
+          </div>
+          <span class="arrow">→</span>
+          <div class="node off" id="n-conv">
+            <div class="t">colexicographical split in A’s shape</div>
+            <div class="c">(2,3,4) · ×1 ×2 ×6</div>
+            <div class="m" id="m-conv"></div>
+          </div>
+          <span class="arrow" id="a-conv">→</span>
+          <div class="node" id="n-A">
+            <div class="t">layout A</div>
+            <div class="c">(2,3,4):(12,4,1)</div>
+            <div class="slots">
+              <div><div class="slot" id="s-a0"></div><div class="cap">shape 2</div></div>
+              <div><div class="slot" id="s-a1"></div><div class="cap">shape 3</div></div>
+              <div><div class="slot" id="s-a2"></div><div class="cap">shape 4</div></div>
+            </div>
+            <div class="m" id="m-A"></div>
+          </div>
+          <span class="arrow">→</span>
+          <div class="node" id="n-res">
+            <div class="t">offset</div>
+            <div class="slot" id="s-res"></div>
+          </div>
+        </div>
+      </div>
+      <div id="err" hidden></div>
+      <div class="grids">
+        <div class="viz" id="viz-b">
+          <div class="vh">B <code>(4,6):(6,1)</code></div>
+          <div class="vs">rows i, columns j · cell is 6·i + j · click to pick</div>
+          <table id="pick"></table>
+        </div>
+        <div class="viz" id="viz-a">
+          <div class="vh">A <code>(2,3,4):(12,4,1)</code></div>
+          <div class="vs">two blocks of a · rows b, columns c · cell is 12·a + 4·b + c</div>
+          <div id="a-slabs"></div>
+        </div>
+        <div class="viz" id="viz-c" hidden>
+          <div class="vh">composition(A, B) <code>(4,(2,3)):(1,(12,4))</code></div>
+          <div class="vs">same (i, j) as B · cell is the offset A returns</div>
+          <table id="comp"></table>
+        </div>
+      </div>
+      <div id="contract" hidden></div>
+    </section>
+
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+
+        const CASES = [
+          {
+            label: "Binary", shape: [2, 2, 2], fast: "right", binary: true,
+            title: "Binary · three digits",
+            cap: `<b>Ordinary counting, in binary.</b> Three digits, each 0 or 1. The <b>rightmost</b> digit changes every step. When it would pass 1, it wraps to 0 and carries one into the digit on its left. Place values are ×4 ×2 ×1, so <code>n = 4·d₂ + 2·d₁ + 1·d₀</code>. Eight values, 0 to 7.`,
+          },
+          {
+            label: "Extended", shape: [2, 3, 4], fast: "right",
+            title: "Extended · shape (2, 3, 4), fastest on the right",
+            cap: `<b>Same counting, each digit its own size.</b> Shape (2, 3, 4): the right digit counts 0–3, the middle 0–2, the left 0–1, and 2·3·4 = 24 values. The right digit is still the fastest. Place values are ×12 ×4 ×1, so <code>n = 12·a + 4·b + 1·c</code>. This is lexicographic order, row-major. As a layout it is <code>(2,3,4):(12,4,1)</code>.`,
+          },
+          {
+            label: "Colex", shape: [2, 3, 4], fast: "left",
+            title: "Colex · the same shape, fastest on the left",
+            cap: `<b>The left digit is the fastest.</b> It counts 0–1, then carries <b>right</b>. Place values are ×1 ×2 ×6, so <code>n = a + 2·b + 6·c</code>. This is <b>colexicographical</b> order: lexicographic order read from the last position backward. Column-major. As a layout it is <code>(2,3,4):(1,2,6)</code>, which is what <code>fx.make_ordered_layout((2,3,4), (0,1,2))</code> prints.`,
+          },
+        ];
+        const STEPS = [
+          {
+            part: 2, stage: "formula",
+            cap: () =>
+              `<b>Composition applies A after B.</b> <code>composition(A, B)(x) = (A ∘ B)(x)</code>. B runs first and returns one offset. A then has to read that offset. The next steps are why that reading is colexicographical.`,
+          },
+          {
+            part: 2, stage: "B",
+            cap: () =>
+              `<b>A layout outputs one number.</b> B = <code>(4,6):(6,1)</code> takes a coordinate (i, j) and returns <code>6·i + 1·j</code>. For (${pick.i}, ${pick.j}) that is <b>${offB()}</b>. Whatever the input shape, the output is a single integer offset.`,
+          },
+          {
+            part: 2, stage: "error",
+            cap: () =>
+              `<b>Feed it straight into A and the types do not match.</b> A = <code>(2,3,4):(12,4,1)</code> has three modes, so it wants a coordinate with three parts. It gets the single number ${offB()}. FlyDSL rejects the call <code>A(${offB()})</code> with the error below. This is the real message from running it.`,
+          },
+          {
+            part: 2, stage: "colex",
+            cap: () => {
+              const [a, b, c] = colexA(offB());
+              return `<b>The contract: read B’s offset as a colexicographical index of A’s shape.</b> Split ${offB()} with shape (2, 3, 4), left digit fastest, exactly the step 3 counter: <code>${offB()} mod 2 = ${a}</code>, <code>(${offB()} ÷ 2) mod 3 = ${b}</code>, <code>${offB()} ÷ 6 = ${c}</code>. Now A gets a coordinate it accepts: <code>A(${a},${b},${c}) = 12·${a} + 4·${b} + 1·${c} = ${offA([a, b, c])}</code>.`;
+            },
+          },
+          {
+            part: 2, stage: "contract",
+            cap: () =>
+              `<b>That is what <code>composition(A, B)</code> does.</b> It is <code>A ∘ colexicographical<sub>A</sub> ∘ B</code>: B’s offset is always treated as the colexicographical index of A’s shape. Both sides agree on that rule, so the pipeline type-checks. FlyDSL gives the same answer as the three stages: <code>composition(A, B)(${pick.i}, ${pick.j}) = ${offA(colexA(offB()))}</code>. Pick another input below to check it.`,
+          },
+        ];
+
+        let step = 0;
+        let run = 0;
+        let timer = null;
+        const pick = { i: 1, j: 2 };
+
+        const offB = () => 6 * pick.i + pick.j;
+        const colexA = (n) => [n % 2, Math.floor(n / 2) % 3, Math.floor(n / 6)];
+        const offA = ([a, b, c]) => 12 * a + 4 * b + c;
+
+        const prod = (xs) => xs.reduce((p, x) => p * x, 1);
+        function places(shape, fast) {
+          return shape.map((_, k) =>
+            fast === "right" ? prod(shape.slice(k + 1)) : prod(shape.slice(0, k))
+          );
+        }
+        function split(n, shape, fast) {
+          const d = new Array(shape.length);
+          const order = fast === "right" ? [...shape.keys()].reverse() : [...shape.keys()];
+          for (const k of order) {
+            d[k] = n % shape[k];
+            n = Math.floor(n / shape[k]);
+          }
+          return d;
+        }
+
+        // dots
+        const dotsEl = $("dots");
+        STEPS.forEach((s, i) => {
+          if (i > 0 && STEPS[i - 1].part !== s.part) {
+            const sep = document.createElement("span");
+            sep.className = "sep";
+            dotsEl.appendChild(sep);
+          }
+          const d = document.createElement("span");
+          d.className = "dot";
+          d.title = s.part === 1 ? "colexicographical order" : "composition";
+          d.addEventListener("click", () => go(i));
+          dotsEl.appendChild(d);
+        });
+
+        function stopAll() {
+          run++;
+          clearTimeout(timer);
+          document.querySelectorAll(".token").forEach((t) => t.remove());
+        }
+
+        /* ---------- part 1 ---------- */
+        let digitEls = [];
+        function buildDigits(st) {
+          const host = $("digits");
+          host.innerHTML = "";
+          digitEls = [];
+          const pv = places(st.shape, st.fast);
+          const fastK = st.fast === "right" ? st.shape.length - 1 : 0;
+          st.shape.forEach((s, k) => {
+            const box = document.createElement("div");
+            box.className = "digit" + (k === fastK ? " fast" : "");
+            const lab = st.binary ? `bit ${st.shape.length - 1 - k}<br>size 2` : `mode ${k}<br>size ${s}`;
+            box.innerHTML = `<div class="lab">${lab}</div><div class="d">0</div><div class="pv">×${pv[k]}</div>`;
+            host.appendChild(box);
+            digitEls.push(box);
+          });
+          $("dir").innerHTML =
+            st.fast === "right"
+              ? `fastest digit: <b>rightmost</b> · carries move ←`
+              : `fastest digit: <b>leftmost</b> · carries move →`;
+        }
+
+        function showCount(st, n, prev) {
+          const d = split(n, st.shape, st.fast);
+          const pv = places(st.shape, st.fast);
+          const fastK = st.fast === "right" ? st.shape.length - 1 : 0;
+          d.forEach((v, k) => {
+            const el = digitEls[k];
+            el.querySelector(".d").textContent = v;
+            el.classList.remove("chg", "carry");
+            if (prev && prev[k] !== v) el.classList.add(k === fastK ? "chg" : "carry");
+          });
+          $("nbig").textContent = n;
+          const terms = d.map((v, k) => `${pv[k]}·${v}`).join(" + ");
+          $("nform").textContent = `n = ${terms} = ${n}`;
+          return d;
+        }
+
+        let mode = 1;
+        let caseIdx = 0;
+        let n = 0;
+        const caseButtons = CASES.map((c, i) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = c.label;
+          b.addEventListener("click", () => { caseIdx = i; n = 0; showCase(); });
+          $("cases").appendChild(b);
+          return b;
+        });
+
+        function showCase() {
+          mode = 1;
+          stopAll();
+          const st = CASES[caseIdx];
+          const total = prod(st.shape);
+          n = Math.max(0, Math.min(total - 1, n));
+          $("part1").hidden = false;
+          $("part2").hidden = true;
+          $("cases").hidden = false;
+          $("dots").hidden = true;
+          $("tab1").classList.add("on");
+          $("tab2").classList.remove("on");
+          $("p1-title").textContent = st.title;
+          $("caption").innerHTML = st.cap;
+          buildDigits(st);
+          const prev = n > 0 ? split(n - 1, st.shape, st.fast) : null;
+          showCount(st, n, prev);
+          $("trail").innerHTML = "";
+          for (let i = 0; i <= n; i++) {
+            const d = split(i, st.shape, st.fast);
+            const chip = document.createElement("span");
+            chip.className = "chip" + (i === n ? " now" : "");
+            chip.innerHTML = st.binary ? `<b>${i}</b> ${d.join("")}` : `<b>${i}</b> (${d.join(",")})`;
+            $("trail").appendChild(chip);
+          }
+          caseButtons.forEach((b, i) => b.classList.toggle("on", i === caseIdx));
+          $("count").textContent = `step ${n + 1} / ${total}`;
+          $("prev").disabled = n === 0;
+          $("next").disabled = n === total - 1;
+        }
+
+        /* ---------- part 2 ---------- */
+        const sleep = (ms, r) =>
+          new Promise((res, rej) => setTimeout(() => (r === run ? res() : rej("cancel")), ms));
+
+        function center(el) {
+          const hb = $("pipe").getBoundingClientRect();
+          const b = el.getBoundingClientRect();
+          return { x: b.left - hb.left + b.width / 2, y: b.top - hb.top + b.height / 2 };
+        }
+
+        async function fly(text, from, to, r, cls = "") {
+          const t = document.createElement("div");
+          t.className = "token " + cls;
+          t.textContent = text;
+          const a = center(from);
+          t.style.left = a.x + "px";
+          t.style.top = a.y + "px";
+          $("pipe").appendChild(t);
+          await sleep(30, r);
+          const b = center(to);
+          t.style.left = b.x + "px";
+          t.style.top = b.y + "px";
+          try {
+            await sleep(760, r);
+          } finally {
+            t.remove();
+          }
+        }
+
+        function resetPipe(st) {
+          ["n-in", "n-B", "n-off", "n-conv", "n-A", "n-res"].forEach((id) => $(id).classList.remove("hot", "bad"));
+          ["s-in", "s-off", "s-a0", "s-a1", "s-a2", "s-res"].forEach((id) => {
+            $(id).textContent = "";
+            $(id).classList.remove("full");
+          });
+          ["m-B", "m-conv", "m-A"].forEach((id) => ($(id).textContent = ""));
+          const conv = st.stage === "colex" || st.stage === "contract";
+          $("n-conv").classList.toggle("off", !conv);
+          $("a-conv").style.visibility = conv ? "visible" : "hidden";
+          $("err").hidden = true;
+          $("contract").hidden = true;
+          $("viz-c").hidden = true;
+          markA(null);
+        }
+
+        function fill(id, v) {
+          $(id).textContent = v;
+          $(id).classList.add("full");
+        }
+
+        async function playPart2(st) {
+          const r = run;
+          const intro = st.stage === "formula";
+          $("formula").hidden = false;
+          $("p2-title").hidden = intro;
+          $("pipe-wrap").hidden = intro;
+          document.querySelector("#part2 .grids").hidden = intro;
+          if (intro) {
+            $("err").hidden = true;
+            $("contract").hidden = true;
+            return;
+          }
+          resetPipe(st);
+          const n = offB();
+          const crd = colexA(n);
+          const out = offA(crd);
+          try {
+            fill("s-in", `(${pick.i},${pick.j})`);
+            await sleep(500, r);
+            await fly(`(${pick.i},${pick.j})`, $("s-in"), $("n-B"), r);
+            $("n-B").classList.add("hot");
+            $("m-B").textContent = `6·${pick.i} + 1·${pick.j} = ${n}`;
+            await sleep(700, r);
+            await fly(`${n}`, $("n-B"), $("s-off"), r);
+            fill("s-off", n);
+            $("n-B").classList.remove("hot");
+            if (st.stage === "B") return;
+
+            await sleep(500, r);
+            if (st.stage === "error") {
+              await fly(`${n}`, $("s-off"), $("n-A"), r, "bad");
+              $("n-A").classList.add("bad");
+              $("m-A").textContent = `got (${n}), wants (a,b,c)`;
+              $("err").hidden = false;
+              $("err").textContent =
+                `A(${n})\n` +
+                `ValueError: profile mismatch: is_profile_weakly_congruent(!fly.int_tuple<(${n})>, !fly.layout<(2,3,4):(12,4,1)>) is False`;
+              return;
+            }
+
+            await fly(`${n}`, $("s-off"), $("n-conv"), r);
+            $("n-conv").classList.add("hot");
+            const lines = [
+              `${n} mod 2       = ${crd[0]}`,
+              `(${n} ÷ 2) mod 3 = ${crd[1]}`,
+              `${n} ÷ 6         = ${crd[2]}`,
+            ];
+            for (let k = 0; k < 3; k++) {
+              $("m-conv").textContent = lines.slice(0, k + 1).join("\n");
+              await sleep(st.stage === "contract" ? 250 : 650, r);
+            }
+            $("n-conv").classList.remove("hot");
+            await Promise.all(crd.map((v, k) => fly(`${v}`, $("n-conv"), $("s-a" + k), r)));
+            crd.forEach((v, k) => fill("s-a" + k, v));
+            markA(crd);
+            $("n-A").classList.add("hot");
+            $("m-A").textContent = `12·${crd[0]} + 4·${crd[1]} + 1·${crd[2]} = ${out}`;
+            await sleep(700, r);
+            await fly(`${out}`, $("n-A"), $("s-res"), r);
+            fill("s-res", out);
+            $("n-A").classList.remove("hot");
+
+            if (st.stage === "contract") {
+              $("viz-c").hidden = false;
+              $("contract").hidden = false;
+              $("contract").textContent =
+                `composition(A, B)(x) = A( colexicographical( B(x) ) )\n\n` +
+                `B                  (4,6):(6,1)\n` +
+                `A                  (2,3,4):(12,4,1)\n` +
+                `colexicographical  idx2crd(n, (2,3,4):(1,2,6))     ${n} → (${crd.join(",")})\n` +
+                `composition(A, B)  (4,(2,3)):(1,(12,4))           (${pick.i},${pick.j}) → ${out}\n\n` +
+                `B's offsets run 0…23 here, one for each of A's 2·3·4 = 24 coordinates.`;
+            }
+          } catch (e) {
+            if (e !== "cancel") throw e;
+          }
+        }
+
+        const offC = (i, j) => i + 12 * (j % 2) + 4 * Math.floor(j / 2);
+
+        function grid46(table, text) {
+          const head = document.createElement("tr");
+          head.innerHTML = `<th>i \\ j</th>` + [0, 1, 2, 3, 4, 5].map((j) => `<th>${j}</th>`).join("");
+          table.appendChild(head);
+          for (let i = 0; i < 4; i++) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<th>${i}</th>`;
+            for (let j = 0; j < 6; j++) {
+              const td = document.createElement("td");
+              td.className = "pick";
+              td.textContent = text(i, j);
+              td.dataset.i = i;
+              td.dataset.j = j;
+              td.addEventListener("click", () => {
+                pick.i = i;
+                pick.j = j;
+                markPick();
+                go(step);
+              });
+              tr.appendChild(td);
+            }
+            table.appendChild(tr);
+          }
+        }
+
+        function buildTables() {
+          grid46($("pick"), (i, j) => 6 * i + j);
+          grid46($("comp"), offC);
+          const host = $("a-slabs");
+          for (let a = 0; a < 2; a++) {
+            const slab = document.createElement("div");
+            const cap = document.createElement("div");
+            cap.className = "slab-cap";
+            cap.textContent = `a = ${a}`;
+            slab.appendChild(cap);
+            const t = document.createElement("table");
+            const head = document.createElement("tr");
+            head.innerHTML = `<th>b \\ c</th>` + [0, 1, 2, 3].map((c) => `<th>${c}</th>`).join("");
+            t.appendChild(head);
+            for (let b = 0; b < 3; b++) {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `<th>${b}</th>`;
+              for (let c = 0; c < 4; c++) {
+                const td = document.createElement("td");
+                td.textContent = 12 * a + 4 * b + c;
+                td.dataset.a = a;
+                td.dataset.b = b;
+                td.dataset.c = c;
+                tr.appendChild(td);
+              }
+              t.appendChild(tr);
+            }
+            slab.appendChild(t);
+            host.appendChild(slab);
+          }
+          markPick();
+        }
+        function markPick() {
+          document.querySelectorAll("#pick td, #comp td").forEach((td) =>
+            td.classList.toggle("sel", +td.dataset.i === pick.i && +td.dataset.j === pick.j)
+          );
+        }
+        function markA(crd) {
+          document.querySelectorAll("#a-slabs td").forEach((td) =>
+            td.classList.toggle("sel", !!crd && +td.dataset.a === crd[0] && +td.dataset.b === crd[1] && +td.dataset.c === crd[2])
+          );
+        }
+
+        /* ---------- driver ---------- */
+        function go(i) {
+          stopAll();
+          step = Math.max(0, Math.min(STEPS.length - 1, i));
+          const st = STEPS[step];
+          mode = 2;
+          $("part1").hidden = true;
+          $("part2").hidden = false;
+          $("cases").hidden = true;
+          $("dots").hidden = false;
+          $("tab1").classList.remove("on");
+          $("tab2").classList.add("on");
+          $("caption").innerHTML = st.cap();
+          [...dotsEl.querySelectorAll(".dot")].forEach((d, j) => d.classList.toggle("on", j === step));
+          $("count").textContent = `step ${step + 1} / ${STEPS.length}`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === STEPS.length - 1;
+          const r = run;
+          requestAnimationFrame(() => {
+            if (r === run) playPart2(st);
+          });
+        }
+
+        function onNext() {
+          if (mode === 1) { n += 1; showCase(); }
+          else go(step + 1);
+        }
+        function onPrev() {
+          if (mode === 1) { n -= 1; showCase(); }
+          else go(step - 1);
+        }
+        $("next").addEventListener("click", onNext);
+        $("prev").addEventListener("click", onPrev);
+        $("replay").addEventListener("click", () => {
+          if (mode === 1) { n = 0; showCase(); }
+          else go(step);
+        });
+        $("tab1").addEventListener("click", () => showCase());
+        $("tab2").addEventListener("click", () => { mode = 2; go(0); });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight") onNext();
+          else if (e.key === "ArrowLeft") onPrev();
+        });
+
+        buildTables();
+        showCase();
+      })();
+    </script>
+  </body>
+</html>

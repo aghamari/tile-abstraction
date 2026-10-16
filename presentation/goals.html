@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Goals</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --blue: #3c7bbf;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      a { color: var(--accent); text-decoration: none; }
+      header {
+        padding: 14px 28px; background: white; border-bottom: 1px solid var(--line);
+        display: flex; gap: 16px; align-items: baseline;
+      }
+      header strong { font-size: 18px; }
+      header small { color: var(--muted); font-size: 14px; }
+      .why {
+        margin: 18px 28px 0; padding: 18px 22px; border-radius: 14px;
+        background: linear-gradient(100deg, #e4f0ec 0%, #e8eff8 100%);
+        border: 1px solid var(--line);
+      }
+      .why .k { font-size: 13px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+      .why p { margin: 8px 0 0; font-size: 22px; line-height: 1.4; max-width: 980px; }
+      ol { list-style: none; margin: 14px 28px 28px; padding: 0; display: grid; gap: 12px; }
+      li {
+        display: grid; grid-template-columns: 52px 1fr; gap: 14px; align-items: start;
+        background: white; border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px;
+      }
+      li .n {
+        width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+        font-size: 22px; font-weight: 750; color: var(--accent); background: #e4f0ec;
+      }
+      li:nth-child(2) .n { color: var(--blue); background: #e3edf8; }
+      li h2 { margin: 0; font-size: 22px; letter-spacing: -0.2px; }
+      li p { margin: 4px 0 0; font-size: 18px; line-height: 1.4; color: var(--muted); }
+      code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.92em; color: var(--ink); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="index.html">Tile abstraction</a>
+      <strong>Goals</strong>
+      <small>why a layout, and what to take from the series</small>
+    </header>
+    <section class="why">
+      <div class="k">Why a layout</div>
+      <p>A GPU kernel gives each thread a piece of the tensor. The tensor is split into tiles, and each tile is split across the threads of the block. A layout is the map from a thread and a value to the element, and to the offset of that element.</p>
+    </section>
+    <ol>
+      <li>
+        <div class="n">1</div>
+        <div>
+          <h2>Read a layout</h2>
+          <p>A layout prints as shape and stride. Reading it means naming the coordinate that goes in and the offset that comes out.</p>
+        </div>
+      </li>
+      <li>
+        <div class="n">2</div>
+        <div>
+          <h2>Combine layout functions</h2>
+          <p><code>raked_product</code>, <code>right_inverse</code>, and <code>composition</code> take small layouts and return the one layout a tile needs. <code>make_layout_tv</code> is that combination.</p>
+        </div>
+      </li>
+      <li>
+        <div class="n">3</div>
+        <div>
+          <h2>Use the layout in the kernel</h2>
+          <p>The tiled copy partitions source and destination with it. The tiled MMA partitions A, B, and C the same way, then computes.</p>
+        </div>
+      </li>
+    </ol>
+  </body>
+</html>

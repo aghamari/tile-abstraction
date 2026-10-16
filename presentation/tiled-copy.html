@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tiled copy</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+        --s: #3c7bbf;
+        --d: #11695a;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body { margin: 0; }
+      a { color: var(--accent); text-decoration: none; }
+      header {
+        padding: 14px 28px; background: white; border-bottom: 1px solid var(--line);
+        display: flex; gap: 16px; align-items: baseline;
+      }
+      header strong { font-size: 18px; }
+      header small { color: var(--muted); font-size: 14px; }
+      .bar { display: flex; align-items: center; gap: 8px; padding: 14px 28px 0; flex-wrap: wrap; }
+      button {
+        font: inherit; font-size: 15px; color: inherit; background: white;
+        border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.on { border-color: var(--accent); background: #e9f3ee; color: var(--accent); font-weight: 650; }
+      .count { font-size: 14px; color: var(--muted); margin-left: 8px; }
+      #caption { margin: 14px 28px 0; font-size: 24px; line-height: 1.35; min-height: 64px; max-width: 1100px; }
+      .panel { margin: 12px 28px 28px; }
+      pre {
+        margin: 0; padding: 16px 18px; background: white; border: 1px solid var(--line);
+        border-radius: 14px; font: 600 16px var(--mono); line-height: 1.55; overflow-x: auto;
+      }
+      pre .cm { color: var(--muted); font-weight: 500; }
+      pre .fn { color: var(--accent); }
+      pre .num { color: #c47b2b; }
+      pre .mark { background: #fbf1e3; border-radius: 4px; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+      .card {
+        background: white; border: 1px solid var(--line); border-radius: 14px;
+        padding: 14px 16px 16px; min-width: 280px; flex: 1;
+      }
+      .card .k { font-size: 13px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+      .card .v { font: 700 22px var(--mono); margin-top: 8px; line-height: 1.35; }
+      .card .n { margin-top: 8px; font-size: 16px; color: var(--muted); }
+      #src-card { border-color: var(--s); }
+      #src-card .k { color: var(--s); }
+      #dst-card { border-color: var(--d); }
+      #dst-card .k { color: var(--d); }
+      .part .v { font-size: 26px; }
+      .flow {
+        display: grid; grid-template-columns: 250px 1fr 1fr; gap: 12px 16px; align-items: stretch;
+      }
+      .flow .h {
+        font-size: 13px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase;
+      }
+      .flow .h.s { color: var(--s); }
+      .flow .h.d { color: var(--d); }
+      .stage .k { font-size: 20px; font-weight: 750; }
+      .stage .what { margin-top: 6px; font: 600 15px var(--mono); color: var(--muted); line-height: 1.4; }
+      .cell {
+        background: white; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+      }
+      .cell.s { border-color: var(--s); }
+      .cell.d { border-color: var(--d); }
+      .cell .v { font: 700 18px var(--mono); line-height: 1.35; }
+      .cell .n { margin-top: 8px; font-size: 16px; color: var(--muted); }
+      .steps { display: grid; grid-template-columns: minmax(340px, 1.15fr) 1fr 1fr; gap: 8px 12px; align-items: center; }
+      .steps .h { font-size: 13px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
+      .steps .h.s { color: var(--s); }
+      .steps .h.d { color: var(--d); }
+      .steps .name { font: 600 14px var(--mono); line-height: 1.35; }
+      .steps .uses { display: block; margin-top: 3px; color: var(--muted); font: 600 13px var(--mono); }
+      .steps .v {
+        font: 700 16px var(--mono); background: white; border: 1px solid var(--line);
+        border-radius: 10px; padding: 8px 12px; line-height: 1.35;
+      }
+      .steps .v.s { border-color: var(--s); }
+      .steps .v.d { border-color: var(--d); }
+      .steps .span { grid-column: 2 / span 2; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="index.html">Tile abstraction</a>
+      <strong>Tiled copy</strong>
+      <small>three examples</small>
+    </header>
+    <div class="bar">
+      <button id="prev">◀ Back</button>
+      <button id="next">Next ▶</button>
+      <span class="count" id="count"></span>
+      <span id="cases"></span>
+    </div>
+    <p id="caption"></p>
+    <section class="panel">
+      <pre id="code"></pre>
+      <div class="row" id="atoms" hidden></div>
+      <div class="row" id="parts" hidden>
+        <div class="card part" id="src-card"><div class="k">partition_S</div><div class="v" id="ps"></div><div class="n" id="ps-n"></div></div>
+        <div class="card part" id="dst-card"><div class="k">partition_D</div><div class="v" id="pd"></div><div class="n" id="pd-n"></div></div>
+      </div>
+      <div class="flow" id="flow" hidden></div>
+      <div class="steps" id="steps" hidden></div>
+    </section>
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        const CASES = [
+          {
+            id: "buffer",
+            label: "BufferCopy · 4×8",
+            atom: "fx.make_copy_atom(fx.rocdl.BufferCopy128b(), fx.Float32)",
+            thr: "(4, 1), (1, 1)", val: "(1, 8), (1, 1)", tvNote: "(4, 8)  (4,8):(1,4)", tileText: "4×8",
+            src: "(1,4):(1,1)", dst: "(1,4):(1,1)", ref: "(1,4):(1,1)",
+            ps: "((4,2),1,1):((1,4),0,0)", pd: "((4,2),1,1):((1,4),0,0)",
+            psNote: "8 values, strides 1 and 4", pdNote: "8 values, strides 1 and 4",
+            stages: [
+              ["(1,4):(0,1)", "4 values, stride 1", "(1,4):(0,1)", "4 values, stride 1"],
+              ["(4,(4,2)):(1,(4,16))", "4 threads, two groups of 4", "(4,(4,2)):(1,(4,16))", "4 threads, two groups of 4"],
+              ["((4,2),1,1):((1,4),0,0)", "this thread, strides 1 and 4", "((4,2),1,1):((1,4),0,0)", "this thread, strides 1 and 4"],
+            ],
+            steps: [
+              ["inv = fx.right_inverse(ref)", "uses ref", "4:1"],
+              ["src2ref = fx.composition(inv, src)", "uses inv and src. dst2ref uses inv and dst", "(1,4):(0,1)", "(1,4):(0,1)"],
+              ["divided = fx.zipped_divide(tv, (1, 4))", "uses tv", "((1,4),(4,2)):((0,4),(1,16))"],
+              ["inside = divided[0]", "first mode of divided", "(1,4):(0,4)"],
+              ["rest = divided[1]", "second mode of divided", "(4,2):(1,16)"],
+              ["composed = fx.composition(inside, src2ref)", "uses inside and src2ref. Destination uses dst2ref", "(1,4):(0,4)", "(1,4):(0,4)"],
+              ["zipped = fx.make_layout(...)", "pairs mode i of composed with mode i of rest", "((1,4),(4,2)):((0,1),(4,16))", "((1,4),(4,2)):((0,1),(4,16))"],
+              ["fx.coalesce(zipped, (1, (1, 1)))", "uses zipped", "(4,(4,2)):(1,(4,16))", "(4,(4,2)):(1,(4,16))"],
+            ],
+            caps: [
+              "4 threads, 8 values. This is the tiled-copy example. make_layout_tv gives the 4×8 tile.",
+              "BufferCopy128b moves 4 f32. Source, destination, and ref are the same layout.",
+              "Each thread owns 8 values, two groups of 4. partition_S and partition_D are the same layout.",
+              "Source and destination stay the same layout at every stage.",
+              "The layout on a row is that call’s result. The next row uses it only when the line says so.",
+            ],
+          },
+          {
+            id: "block",
+            label: "BufferCopy · 8×24",
+            atom: "fx.make_copy_atom(fx.rocdl.BufferCopy128b(), fx.Float32)",
+            thr: "(4, 1), (1, 1)", val: "(1, 8), (1, 1)", tvNote: "(4, 8)  (4,8):(1,4)", tileText: "8×24",
+            src: "(1,4):(1,1)", dst: "(1,4):(1,1)", ref: "(1,4):(1,1)",
+            ps: "((4,2),2,3):((1,4),96,8)", pd: "((4,2),2,3):((1,4),96,8)",
+            psNote: "2 tiles down, 3 across", pdNote: "2 tiles down, 3 across",
+            stages: [
+              ["(1,4):(0,1)", "4 values, stride 1", "(1,4):(0,1)", "4 values, stride 1"],
+              ["(4,(4,2)):(1,(4,16))", "4 threads, two groups of 4", "(4,(4,2)):(1,(4,16))", "4 threads, two groups of 4"],
+              ["((4,2),2,3):((1,4),96,8)", "repeats 2 by 3", "((4,2),2,3):((1,4),96,8)", "repeats 2 by 3"],
+            ],
+            steps: [
+              ["inv = fx.right_inverse(ref)", "uses ref", "4:1"],
+              ["src2ref = fx.composition(inv, src)", "uses inv and src. dst2ref uses inv and dst", "(1,4):(0,1)", "(1,4):(0,1)"],
+              ["divided = fx.zipped_divide(tv, (1, 4))", "uses tv", "((1,4),(4,2)):((0,4),(1,16))"],
+              ["inside = divided[0]", "first mode of divided", "(1,4):(0,4)"],
+              ["rest = divided[1]", "second mode of divided", "(4,2):(1,16)"],
+              ["composed = fx.composition(inside, src2ref)", "uses inside and src2ref. Destination uses dst2ref", "(1,4):(0,4)", "(1,4):(0,4)"],
+              ["zipped = fx.make_layout(...)", "pairs mode i of composed with mode i of rest", "((1,4),(4,2)):((0,1),(4,16))", "((1,4),(4,2)):((0,1),(4,16))"],
+              ["fx.coalesce(zipped, (1, (1, 1)))", "uses zipped", "(4,(4,2)):(1,(4,16))", "(4,(4,2)):(1,(4,16))"],
+            ],
+            caps: [
+              "Same 4×8 tile and the same atom. The block is 8×24, the block in the tiled-copy example.",
+              "BufferCopy128b still moves 4 f32. Source, destination, and ref stay (1,4):(1,1).",
+              "The block holds 2 tiles down and 3 across. Both partitions print ((4,2), 2, 3). The 2 steps by 96, the 3 steps by 8.",
+              "The tile stages are the 4×8 copy. The repeat shows up when that tile is placed on the 8×24 block.",
+              "These calls build the 4×8 tile. The 2 and the 3 are the block around that tile.",
+            ],
+          },
+          {
+            id: "lds",
+            label: "LDS · (4,4), 2",
+            atom: "fx.make_copy_atom(fx.rocdl.cdna4.LDSReadTrans16_64b(), fx.Float16)",
+            thr: "(32, 1), (1, 1)", val: "(1, 4), (1, 1)", tvNote: "(32, 4)  (32,4):(1,32)", tileText: "32×4",
+            tvLine: "tv = fx.make_layout((32, 4), (1, 32))   # print_tv_steps",
+            src: "(16,4):(4,1)", dst: "(16,(1,4)):(1,(1,16))", ref: "(16,(1,4)):(1,(1,16))",
+            ps: "((4,1),1,1):((4,0),0,0)", pd: "((4,1),1,1):((1,0),0,0)",
+            psNote: "4 values, stride 4", pdNote: "4 values, stride 1",
+            stages: [
+              ["(16,4):(4,1)", "thread steps by 4", "(16,(1,4)):(1,(0,16))", "value steps by 16"],
+              ["(((4,4),2),(4,1)):(((4,32),16),(1,0))", "threads (4,4), then 2 groups", "(32,(4,1)):(1,(32,0))", "32 threads, value stride 32"],
+              ["((4,1),1,1):((4,0),0,0)", "this thread, stride 4", "((4,1),1,1):((1,0),0,0)", "this thread, stride 1"],
+            ],
+            steps: [
+              ["inv = fx.right_inverse(ref)", "uses ref", "64:1"],
+              ["src2ref = fx.composition(inv, src)", "uses inv and src. dst2ref uses inv and dst", "(16,4):(4,1)", "(16,(1,4)):(1,(0,16))"],
+              ["divided = fx.zipped_divide(tv, (16, 4))", "uses tv", "((16,4),(2,1)):((1,32),(16,0))"],
+              ["inside = divided[0]", "first mode of divided", "(16,4):(1,32)"],
+              ["rest = divided[1]", "second mode of divided", "(2,1):(16,0)"],
+              ["composed = fx.composition(inside, src2ref)", "uses inside and src2ref. Destination uses dst2ref", "((4,4),4):((4,32),1)", "(16,(1,4)):(1,(0,32))"],
+              ["zipped = fx.make_layout(...)", "pairs mode i of composed with mode i of rest", "(((4,4),2),(4,1)):(((4,32),16),(1,0))", "((16,2),((1,4),1)):((1,16),((0,32),0))"],
+              ["fx.coalesce(zipped, (1, (1, 1)))", "uses zipped", "((4,4,2),(4,1)):((4,32,16),(1,0))", "(32,(4,1)):(1,(32,0))"],
+            ],
+            caps: [
+              "tv is fx.make_layout((32, 4), (1, 32)). This is the example whose threads become (4,4), then 2 groups.",
+              "Source and destination are different layouts. ref matches the destination. The source stride on the value mode is 4.",
+              "This thread still owns 4 values. partition_S steps by 4. partition_D stays packed, stride 1.",
+              "Source threads are ((4,4), 2). Coalesce flattens that to (4,4,2). Destination coalesce is (32,(4,1)):(1,(32,0)).",
+              "The layout on a row is that call’s result. zipped_divide starts from tv, not from the row above.",
+            ],
+          },
+          {
+            id: "lds16",
+            label: "LDS · 16×8",
+            atom: "fx.make_copy_atom(fx.rocdl.cdna4.LDSReadTrans16_64b(), fx.Float16)",
+            thr: "(16, 1), (1, 1)", val: "(1, 8), (1, 1)", tvNote: "(16, 8)  (16,8):(1,16)", tileText: "16×8",
+            src: "(16,4):(4,1)", dst: "(16,(1,4)):(1,(1,16))", ref: "(16,(1,4)):(1,(1,16))",
+            ps: "((4,2),1,1):((8,4),0,0)", pd: "((4,2),1,1):((1,4),0,0)",
+            psNote: "8 values, strides 8 and 4", pdNote: "8 values, strides 1 and 4",
+            stages: [
+              ["(16,4):(4,1)", "thread steps by 4", "(16,(1,4)):(1,(0,16))", "value steps by 16"],
+              ["(16,(4,2)):(4,(1,64))", "two groups of 4 values", "(16,(4,2)):(1,(16,64))", "value strides 16 and 64"],
+              ["((4,2),1,1):((8,4),0,0)", "this thread, strides 8 and 4", "((4,2),1,1):((1,4),0,0)", "this thread, strides 1 and 4"],
+            ],
+            steps: [
+              ["inv = fx.right_inverse(ref)", "uses ref", "64:1"],
+              ["src2ref = fx.composition(inv, src)", "uses inv and src. dst2ref uses inv and dst", "(16,4):(4,1)", "(16,(1,4)):(1,(0,16))"],
+              ["divided = fx.zipped_divide(tv, (16, 4))", "uses tv", "((16,4),(1,2)):((1,16),(0,64))"],
+              ["inside = divided[0]", "first mode of divided", "(16,4):(1,16)"],
+              ["rest = divided[1]", "second mode of divided", "(1,2):(0,64)"],
+              ["composed = fx.composition(inside, src2ref)", "uses inside and src2ref. Destination uses dst2ref", "(16,4):(4,1)", "(16,(1,4)):(1,(0,16))"],
+              ["zipped = fx.make_layout(...)", "pairs mode i of composed with mode i of rest", "((16,1),(4,2)):((4,0),(1,64))", "((16,1),((1,4),2)):((1,0),((0,16),64))"],
+              ["fx.coalesce(zipped, (1, (1, 1)))", "uses zipped", "(16,(4,2)):(4,(1,64))", "(16,(4,2)):(1,(16,64))"],
+            ],
+            caps: [
+              "16 threads, 8 values. The atom still moves 4 values, so each thread owns two groups of them.",
+              "The atom layouts are the same transpose read. The tile around them is 16×8.",
+              "This thread owns 8 values. partition_S strides are 8 and 4. partition_D strides are 1 and 4.",
+              "Same three stages. The leftover is now 2 value groups, and both partitions keep that 2.",
+              "The layout on a row is that call’s result. rest is the second mode of divided: (1,2):(0,64).",
+            ],
+          },
+        ];
+        $("cases").innerHTML = CASES.map((c) => `<button type="button" data-id="${c.id}">${c.label}</button>`).join("");
+        let caseId = "buffer";
+        let step = 0;
+
+        function show() {
+          const c = CASES.find((item) => item.id === caseId);
+          $("caption").textContent = c.caps[step];
+          const hi = (line) => {
+            const hash = line.indexOf("#");
+            const body = hash < 0 ? line : line.slice(0, hash);
+            const comment = hash < 0 ? "" : line.slice(hash);
+            const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+            let html = "";
+            for (const m of body.matchAll(/\d+|[A-Za-z_]\w*(?=\()|[A-Za-z_]\w*|./g)) {
+              const t = m[0];
+              const cls = /^\d+$/.test(t) ? "num" : /^[A-Za-z_]/.test(t) && body[m.index + t.length] === "(" ? "fn" : "";
+              html += cls ? `<span class="${cls}">${esc(t)}</span>` : esc(t);
+            }
+            return html + (comment ? `<span class="cm">${esc(comment)}</span>` : "");
+          };
+          const mark = (line) => `<span class="mark">${hi(line)}</span>`;
+          $("code").innerHTML = [
+            hi(`thr = fx.make_layout(${c.thr})`),
+            hi(`val = fx.make_layout(${c.val})`),
+            hi(`tile_mn, tv = fx.make_layout_tv(thr, val)   # ${c.tvNote}`),
+            c.tvLine ? mark(c.tvLine) : "",
+            mark(`atom = ${c.atom}`),
+            hi("tiled = fx.make_tiled_copy(atom, tv, tile_mn)"),
+            hi("thr_copy = tiled.get_slice(tid)"),
+            hi(`partition_S = thr_copy.partition_S(tile)   # ${c.tileText}`),
+            hi("partition_D = thr_copy.partition_D(tile)"),
+          ].filter(Boolean).join("\n");
+          $("code").hidden = step >= 3;
+          $("atoms").hidden = step !== 1 && step !== 2;
+          $("parts").hidden = step !== 2;
+          $("flow").hidden = step !== 3;
+          $("steps").hidden = step !== 4;
+          if (step === 1 || step === 2) {
+            $("atoms").innerHTML = [
+              ["atom · source", c.src],
+              ["atom · destination", c.dst],
+              ["atom · ref", c.ref],
+            ].map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+          }
+          if (step === 2) {
+            $("ps").textContent = c.ps;
+            $("pd").textContent = c.pd;
+            $("ps-n").textContent = c.psNote;
+            $("pd-n").textContent = c.pdNote;
+          }
+          if (step === 3) {
+            const labels = [
+              ["1 · Instruction", "right_inverse(ref), then src or dst"],
+              ["2 · Tile", `place that in the ${c.tileText} tile, coalesce`],
+              ["3 · This thread", "compose with the tensor, drop the thread"],
+            ];
+            $("flow").innerHTML =
+              `<div></div><div class="h s">source → partition_S</div><div class="h d">destination → partition_D</div>` +
+              c.stages.map((row, i) =>
+                `<div class="stage"><div class="k">${labels[i][0]}</div><div class="what">${labels[i][1]}</div></div>` +
+                `<div class="cell s"><div class="v">${row[0]}</div><div class="n">${row[1]}</div></div>` +
+                `<div class="cell d"><div class="v">${row[2]}</div><div class="n">${row[3]}</div></div>`
+              ).join("");
+          }
+          if (step === 4) {
+            $("steps").innerHTML =
+              `<div class="h">this call prints</div><div class="h s">source</div><div class="h d">destination</div>` +
+              c.steps.map((row) => {
+                const call = `<div class="name">${row[0]}<span class="uses">${row[1]}</span></div>`;
+                return row.length === 3
+                  ? `${call}<div class="v span">${row[2]}</div>`
+                  : `${call}<div class="v s">${row[2]}</div><div class="v d">${row[3]}</div>`;
+              }).join("");
+          }
+          document.querySelectorAll("#cases button").forEach((b) => b.classList.toggle("on", b.dataset.id === caseId));
+          $("count").textContent = `${step + 1} / 5`;
+          $("prev").disabled = step === 0;
+          $("next").disabled = step === 4;
+        }
+
+        $("cases").addEventListener("click", (event) => {
+          const button = event.target.closest("button");
+          if (!button) return;
+          caseId = button.dataset.id;
+          show();
+        });
+        $("next").addEventListener("click", () => { step += 1; show(); });
+        $("prev").addEventListener("click", () => { step -= 1; show(); });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowRight" && !$("next").disabled) { step += 1; show(); }
+          else if (e.key === "ArrowLeft" && !$("prev").disabled) { step -= 1; show(); }
+        });
+        show();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tile abstraction</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #203c40;
+        background: #f4f7f5;
+        --ink: #203c40;
+        --muted: #536b65;
+        --line: #d3e0d9;
+        --accent: #11695a;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 1180px; }
+      [hidden] { display: none !important; }
+      button {
+        font: inherit;
+        color: inherit;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: var(--accent); }
+      code, pre { font-family: var(--mono); }
+      header {
+        height: 62px;
+        padding: 0 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: white;
+        border-bottom: 1px solid var(--line);
+      }
+      header strong { font-size: 18px; }
+      header small { font-size: 12px; color: var(--muted); margin-left: 18px; }
+      .actions { display: flex; gap: 8px; font-size: 12px; }
+      .shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 330px;
+        max-width: 1680px;
+        margin: auto;
+      }
+      .shell.closed { grid-template-columns: minmax(0, 1fr); }
+      main { padding: 20px 32px 32px; min-width: 0; }
+      h1 { font-size: 30px; letter-spacing: -0.8px; margin: 0; }
+      h2 { font-size: 17px; letter-spacing: -0.2px; margin: 0; }
+      h3 { font-size: 13px; margin: 0 0 8px; }
+      .heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+      .heading { flex-wrap: wrap; }
+      .heading > code { font-size: 28px; color: var(--ink); font-weight: 650; letter-spacing: -0.4px; }
+      .heading > code.pair { font-size: 16px; display: block; width: 100%; white-space: pre-wrap; line-height: 1.45; }
+      .stride-quiz { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+      .stride-line {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--mono);
+        font-size: 22px;
+        font-weight: 650;
+        letter-spacing: -0.3px;
+      }
+      .stride-line input {
+        width: 4.2ch;
+        font: inherit;
+        font-weight: 650;
+        text-align: center;
+        padding: 2px 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: white;
+      }
+      .stride-line input.bad { border-color: #a33; background: #fdecec; }
+      .stride-line input.ok { border-color: var(--accent); background: #e9f3ee; }
+      #stride-check { font-size: 14px; font-weight: 650; border-color: var(--accent); color: var(--accent); padding: 6px 12px; }
+      #stride-verdict { font-size: 16px; min-width: 4.5em; }
+      #stride-verdict.ok { color: var(--accent); }
+      #stride-verdict.bad { color: #a33; }
+      .stride-hint { margin: 0; font-size: 12px; color: var(--muted); font-weight: 400; }
+      .examples { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+      .examples button[aria-pressed="true"] {
+        border-color: var(--accent);
+        background: #e9f3ee;
+        color: var(--accent);
+        font-weight: 650;
+      }
+      #example-note { min-height: 40px; margin: 0 0 8px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+      #reveal { margin: 0 0 14px; border-color: var(--accent); color: var(--accent); font-weight: 650; }
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+        gap: 14px;
+        align-items: start;
+      }
+      .workspace.stack { grid-template-columns: 1fr; }
+      .pairs.side { flex-wrap: nowrap; }
+      .panel {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        padding: 16px 18px;
+        min-width: 0;
+      }
+      .panel-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .panel-heading span { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+      .matrix { display: grid; gap: 4px; width: max-content; }
+      .tick {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font: 10px var(--mono);
+        color: var(--muted);
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        border: 1px solid #203b4022;
+        border-radius: 6px;
+        background: var(--fill, white);
+        font-family: var(--mono);
+        color: var(--ink);
+        padding: 0;
+      }
+      .cell b { font-size: 12px; font-weight: 650; }
+      .cell small { font-size: 9px; color: var(--muted); }
+      .cell.quiet { color: #8aa099; }
+      .cell.quiet b { font-weight: 500; }
+      .matrix.dense .cell b, .mode-block.dense .cell b { font-size: 10px; }
+      .cell.selected { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 1; }
+      .cell.related { outline: 2px dashed var(--accent); outline-offset: 2px; }
+      #grid-map { overflow-x: auto; }
+      .pairs { display: flex; gap: 22px; flex-wrap: wrap; align-items: start; }
+      .pairs h3 { font-size: 13px; margin: 0 0 8px; }
+      .nest { display: grid; gap: 8px; width: max-content; }
+      .mode-block {
+        display: grid;
+        gap: 2px;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #f8faf9;
+      }
+      .steps { display: flex; flex-direction: column; gap: 8px; }
+      .step {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 12px;
+        background: #f8faf9;
+      }
+      .step .n {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: white;
+        border: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .step .label { font-size: 12px; font-weight: 700; }
+      .step code { font-size: 12px; display: block; margin: 3px 0; }
+      .step p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+      .memory { margin-top: 16px; }
+      .memory h3 { font-size: 13px; margin: 0 0 8px; }
+      .mem { display: flex; flex-wrap: wrap; gap: 4px; }
+      .mem button {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .mem button.gap {
+        background: transparent;
+        color: #b7c6c0;
+        border-style: dashed;
+        font-weight: 500;
+      }
+      .mem button.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .panel-foot { margin-top: 10px; font-size: 12px; color: var(--muted); }
+      .lookup { margin-top: 14px; }
+      .route {
+        display: grid;
+        grid-template-columns: 1fr 28px 1fr 28px 1fr;
+        gap: 8px;
+        align-items: center;
+      }
+      .route-step .label { font-size: 11px; color: var(--muted); font-weight: 650; }
+      .route-step code { font-size: 18px; display: block; margin: 5px 0 4px; }
+      .route-step small { display: block; font-size: 10px; color: var(--muted); min-height: 14px; }
+      .arrow { text-align: center; color: var(--muted); font-size: 18px; }
+      #route-summary { margin-top: 10px; font-size: 13px; }
+      details {
+        margin-top: 14px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      summary {
+        font-size: 13px;
+        font-weight: 650;
+        color: var(--accent);
+        padding: 13px 18px;
+        cursor: pointer;
+      }
+      pre {
+        margin: 0 18px 18px;
+        background: #f3f6f4;
+        padding: 12px;
+        border-radius: 7px;
+        font: 12px/1.7 var(--mono);
+        white-space: pre-wrap;
+      }
+      aside {
+        background: white;
+        border-left: 1px solid var(--line);
+        padding: 26px 23px;
+      }
+      aside h2 { margin: 0 0 22px; font-size: 20px; }
+      aside p { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 0 0 10px; }
+      aside section + section {
+        border-top: 1px solid var(--line);
+        padding-top: 20px;
+        margin-top: 20px;
+      }
+      aside code { font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>Tile abstraction</strong>
+      </div>
+      <div class="actions">
+        <button id="guide-toggle" aria-controls="guide" aria-expanded="true">Guide</button>
+      </div>
+    </header>
+    <div id="shell" class="shell">
+      <main>
+        <div class="heading">
+          <h1>Tile abstraction</h1>
+          <code id="layout-printed"></code>
+          <div id="stride-quiz" class="stride-quiz" hidden>
+            <div class="stride-line">
+              <code id="stride-shape"></code>
+              <span>:((</span>
+              <input id="s-tr" inputmode="numeric" aria-label="Row stride inside the window" />
+              <span>,</span>
+              <input id="s-tc" inputmode="numeric" aria-label="Column stride inside the window" />
+              <span id="stride-mid">), (</span>
+              <input id="s-wr" inputmode="numeric" aria-label="Row stride to the next window" />
+              <span>,</span>
+              <input id="s-wc" inputmode="numeric" aria-label="Column stride to the next window" />
+              <span id="stride-close">))</span>
+              <button type="button" id="stride-check">Check</button>
+              <strong id="stride-verdict"></strong>
+            </div>
+            <p class="stride-hint">First pair: one step inside the window. Second pair: one step to the next window.</p>
+          </div>
+        </div>
+        <div class="examples" id="examples" aria-label="Choose an example"></div>
+        <p id="example-note"></p>
+        <button id="reveal" type="button" hidden>Show the answer</button>
+        <div class="workspace">
+          <section class="panel">
+            <div class="panel-heading">
+              <h2 id="grid-title">Layout</h2>
+              <span id="grid-note"></span>
+            </div>
+            <div id="grid-map"></div>
+            <div class="memory">
+              <h3>Memory, address order</h3>
+              <div class="mem" id="memory"></div>
+            </div>
+            <div class="panel-foot" id="grid-foot"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>This cell</h2>
+              <span id="cell-name"></span>
+            </div>
+            <div class="steps" id="steps"></div>
+          </section>
+        </div>
+        <section class="panel lookup">
+          <div class="panel-heading"><h2>Coordinate to offset</h2></div>
+          <div class="route">
+            <div class="route-step">
+              <div class="label">Coordinate</div>
+              <code id="step-coord"></code>
+              <small id="step-coord-note"></small>
+            </div>
+            <div class="arrow">→</div>
+            <div class="route-step">
+              <div class="label">Each mode times its stride</div>
+              <code id="step-sum"></code>
+              <small id="step-sum-note"></small>
+            </div>
+            <div class="arrow">→</div>
+            <div class="route-step">
+              <div class="label">Offset</div>
+              <code id="step-off"></code>
+              <small id="step-off-note"></small>
+            </div>
+          </div>
+          <div id="route-summary"></div>
+        </section>
+        <details open>
+          <summary>FlyDSL</summary>
+          <pre id="code"></pre>
+        </details>
+      </main>
+      <aside id="guide">
+        <h2>Guide</h2>
+        <section>
+          <h3>The number is the offset</h3>
+          <p>
+            Same idea as CuTe <code>print_layout</code>. Rows and columns are
+            the coordinate. The number in the cell is where that coordinate
+            sits in memory.
+          </p>
+        </section>
+        <section>
+          <h3>Which side has stride 1</h3>
+          <p>
+            Row-major <code>(5, 5):(5, 1)</code> walks across a row.
+            Column-major <code>(5, 5):(1, 5)</code> walks down a column.
+            Cell <code>(2, 3)</code> is 13 in the first and 17 in the second.
+            The strip under the grid is that same offset in address order.
+          </p>
+          <p>
+            <code>(2, 4):(12, 1)</code> is the strided row from that page.
+            The row is still contiguous. Eight addresses are skipped before
+            the next row, and the strip shows those gaps.
+          </p>
+        </section>
+        <section>
+          <h3>Nested, then the button</h3>
+          <p>
+            <code>(2, (2, 2)):(4, (2, 1))</code> and
+            <code>(3, (2, 3)):(3, (12, 1))</code> are the nested prints on the
+            CuTe layout page. The layout stays up. The offsets stay blank
+            until Show the indices.
+          </p>
+          <p>
+            The reverse tab fills the table first. The layout stays hidden
+            until Show the layout.
+          </p>
+          <p>
+            The tiled tab and the overlapping tab show the picture with the
+            offsets filled in. The shape stays in the layout line. The four
+            strides start empty. Check says Okay, or Not okay.
+          </p>
+          <p>
+            Partition S shows the layout first. Show the tiles draws the six
+            4×8 tiles. The <code>(4, 2)</code> is eight columns of one row,
+            two copies of four, not a 4×2 block.
+          </p>
+          <p>
+            The last quiz is <code>partition_S</code> on a 30×16 block. The
+            print is <code>((4, 5), 3, 2):((1, 16), 160, 8)</code>. The 4 is
+            columns, the 5 is rows, the 3 is tiles down, and the 2 is tiles
+            across.
+          </p>
+          <p>
+            The transpose quiz is one <code>ds_read_tr</code>. Source and dest
+            print the same shape, <code>((4, 2), 2, 3)</code>. The stride of
+            the 4 is 24 on the source and 1 on the dest. Show the answer draws
+            both.
+          </p>
+          <p>
+            Layout A shows one 16×16 tile. The top number is the lane. The
+            bottom number is that lane's value. A column is contiguous, so the
+            next column starts 16 later. Show the answer prints
+            <code>((16, 4), 4):((1, 64), 16)</code>.
+          </p>
+          <p>
+            Retile shows one coordinate in two places. The tensor row is 16
+            wide, so the next group of 16 rows starts at 256. The same group
+            in the registers starts 4 later.
+          </p>
+        </section>
+      </aside>
+    </div>
+    <script>
+      const hues = [199, 32, 155, 274, 350, 64, 220, 90, 180];
+      const color = (i) => `hsl(${hues[i % hues.length]} 46% 86%)`;
+      const examples = [
+        {
+          id: "row5",
+          label: "5×5 rows",
+          note: "Row-major. A step across the row adds 1. A step down the column adds 5. Cell (2, 3) is 13. The strip is the same numbers in address order.",
+          printed: "(5, 5):(5, 1)",
+          tileR: 5, tileC: 5, winR: 1, winC: 1,
+          sTr: 5, sTc: 1, sWr: 0, sWc: 0,
+          sel: [2, 3, 0, 0],
+          kind: "flat",
+        },
+        {
+          id: "col5",
+          label: "5×5 columns",
+          note: "Column-major, same shape. Stride 1 is down the column. Cell (2, 3) is 2×1 + 3×5 = 17. In the strip, 17 is just address 17.",
+          printed: "(5, 5):(1, 5)",
+          tileR: 5, tileC: 5, winR: 1, winC: 1,
+          sTr: 1, sTc: 5, sWr: 0, sWc: 0,
+          sel: [2, 3, 0, 0],
+          kind: "flat",
+        },
+        {
+          id: "skip",
+          label: "2×4 stride 12",
+          note: "Same 2×4 shape, row stride 12. The row is still contiguous. Eight elements are skipped before the next row.",
+          printed: "(2, 4):(12, 1)",
+          tileR: 2, tileC: 4, winR: 1, winC: 1,
+          sTr: 12, sTc: 1, sWr: 0, sWc: 0,
+          sel: [1, 2, 0, 0],
+          kind: "flat",
+        },
+        {
+          id: "tiles",
+          label: "Quiz · (2,(2,2))",
+          note: "CuTe (2,(2,2)):(4,(2,1)). The layout is the question. Fill each cell, then show the indices. Color is the inner column pair.",
+          printed: "(2,(2,2)):(4,(2,1))",
+          tileR: 2, tileC: 2, winR: 1, winC: 2,
+          sTr: 4, sTc: 2, sWr: 0, sWc: 1,
+          sel: [0, 0, 0, 1],
+          kind: "tiles",
+          quiz: "indices",
+        },
+        {
+          id: "pair36",
+          label: "Quiz · (3,(2,3))",
+          note: "CuTe (3,(2,3)):(3,(12,1)). Three rows, and the columns are a (2, 3) pair. Fill the offsets, then show the indices. Coordinate (1, 5) is the page's worked example.",
+          printed: "(3,(2,3)):(3,(12,1))",
+          tileR: 3, tileC: 2, winR: 1, winC: 3,
+          sTr: 3, sTc: 12, sWr: 0, sWc: 1,
+          sel: [1, 1, 0, 2],
+          kind: "tiles",
+          quiz: "indices",
+        },
+        {
+          id: "copy42",
+          label: "Quiz · (4,(4,2))",
+          note: "Four threads down the rows, eight columns across, split into two copies of four. CuTe (4,(4,2)):(1,(4,16)). A step down the column adds 1. The next column adds 4, one column of threads. The second copy starts four columns later, at 16. Fill each cell, then show the indices. Color is one copy.",
+          printed: "(4,(4,2)):(1,(4,16))",
+          tileR: 4, tileC: 4, winR: 1, winC: 2,
+          sTr: 1, sTc: 4, sWr: 0, sWc: 16,
+          sel: [0, 0, 0, 1],
+          kind: "tiles",
+          quiz: "indices",
+        },
+        {
+          id: "rowpair",
+          label: "Reverse · nested rows",
+          note: "The numbers are the offsets. This is the nested-row matrix on the CuTe page. What layout prints it?",
+          printed: "((2,2),2):((4,1),2)",
+          tileR: 2, tileC: 2, winR: 2, winC: 1,
+          sTr: 4, sTc: 2, sWr: 1, sWc: 0,
+          sel: [0, 1, 1, 0],
+          kind: "nest-rows",
+          quiz: "layout",
+        },
+        {
+          id: "windows",
+          label: "Quiz · tiled window",
+          note: "The picture is filled in. The shape is ((3, 3), (2, 2)). Write the four strides.",
+          quiz: "strides",
+          printed: "((3, 3), (2, 2)):((6, 1), (18, 3))",
+          tileR: 3, tileC: 3, winR: 2, winC: 2,
+          image: 6,
+          sTr: 6, sTc: 1, sWr: 18, sWc: 3,
+          sel: [1, 1, 0, 0],
+          kind: "windows",
+        },
+        {
+          id: "overlap",
+          label: "Quiz · overlapping",
+          note: "The picture is filled in. The shape is ((3, 3), (3, 3)). Write the four strides. A repeated number is a cell two windows share.",
+          quiz: "strides",
+          printed: "((3, 3), (3, 3)):((5, 1), (5, 1))",
+          tileR: 3, tileC: 3, winR: 3, winC: 3,
+          image: 5,
+          sTr: 5, sTc: 1, sWr: 5, sWc: 1,
+          sel: [1, 1, 1, 1],
+          kind: "windows",
+          overlap: true,
+        },
+        {
+          id: "partition",
+          label: "Quiz · partition S",
+          note: "The layout is given. (4, 2) is eight values along one row, two copies of four. It is not a 4×2 block. Show the tiles to see those values inside the six 4×8 tiles.",
+          quiz: "tiles",
+          printed: "((4, 2), 2, 3):((1, 4), 96, 8)",
+          tileR: 4, tileC: 2, winR: 2, winC: 3,
+          sTr: 1, sTc: 4, sWr: 96, sWc: 8,
+          sel: [0, 0, 1, 0],
+          kind: "partition",
+        },
+        {
+          id: "val2d",
+          label: "Quiz · partition 4×5",
+          note: "The line above is what partition_S prints for the copy under FlyDSL. The block is 30×16 and row-major. (4, 5):(1, 16) is four columns, then five rows. The 3 is tiles down and the 2 is tiles across. Show the tiles.",
+          quiz: "tiles",
+          printed: "((4, 5), 3, 2):((1, 16), 160, 8)",
+          sTr: 1, sTc: 16, sWr: 160, sWc: 8,
+          sel: [1, 2, 1, 1],
+          kind: "val2d",
+        },
+        {
+          id: "transpose",
+          label: "Quiz · transpose",
+          note: "One ds_read_tr. The value is 2 rows by 4 columns, and the block is 64×12. partition_S and partition_D have the same shape. The 4 is one copy: source stride 24, dest stride 1. Show the tiles.",
+          quiz: "tiles",
+          printed: "S ((4, 2), 2, 3):((24, 12), 384, 4)\nD ((4, 2), 2, 3):((1, 12), 384, 4)",
+          sTr: 24, sTc: 12, sWr: 384, sWc: 4,
+          dTr: 1, dTc: 12, dWr: 384, dWc: 4,
+          sel: [1, 1, 1, 1],
+          kind: "transpose",
+        },
+        {
+          id: "retile",
+          label: "Retile · buffer 16b",
+          note: "Same coordinate on the 32×16 tensor and in the eight registers. The 4 steps by 1 in both. The 2 steps by 256 in the tensor and by 4 in the registers. Click a colored cell.",
+          printed: "S ((1, 4), 2, 1):((0, 1), 256, 0)\nR ((1, 4), 2, 1):((0, 1), 4, 0)",
+          sTr: 0, sTc: 1, sWr: 256, sWc: 0,
+          dTr: 0, dTc: 1, dWr: 4, dWc: 0,
+          sel: [0, 1, 1, 0],
+          kind: "retile",
+        },
+        {
+          id: "mfma-a",
+          label: "Quiz · layout A",
+          note: "One 16×16 A tile, column-major. The top number is the lane. The bottom number is that lane's value, 0–3. Write the layout.",
+          quiz: "layout",
+          printed: "((16, 4), 4):((1, 64), 16)",
+          sTr: 1, sTc: 64, sWr: 16, sWc: 0,
+          sel: [1, 1, 1, 0],
+          kind: "mfma",
+        },
+      ];
+      const byId = Object.fromEntries(examples.map((ex) => [ex.id, ex]));
+      let current = examples[0];
+
+      function offset(ex, tr, tc, wr, wc) {
+        return tr * ex.sTr + tc * ex.sTc + wr * ex.sWr + wc * ex.sWc;
+      }
+
+      function ticks(n, axis) {
+        return Array.from({ length: n }, (_, i) => {
+          const row = axis === "r" ? i + 2 : 1;
+          const col = axis === "c" ? i + 2 : 1;
+          return `<span class="tick" style="grid-row:${row};grid-column:${col}">${i}</span>`;
+        }).join("");
+      }
+
+      function cellButton(r, c, size, big, cls, data, fill) {
+        return `<button type="button" class="cell ${cls}" data-c="${data}" style="grid-row:${r + 2};grid-column:${c + 2};width:${size}px;height:${size}px;--fill:${fill}"><b>${big}</b></button>`;
+      }
+
+      function paintSteps(steps) {
+        document.getElementById("steps").innerHTML = steps
+          .map((step, i) => `<div class="step"><div class="n">${i + 1}</div><div><div class="label">${step.label}</div><code>${step.code}</code><p>${step.text}</p></div></div>`)
+          .join("");
+      }
+
+      function idx2crdLine(ex, off) {
+        if (ex.kind !== "flat") return "";
+        const rows = ex.tileR;
+        const cols = ex.tileC;
+        if (ex.sTr === cols && ex.sTc === 1) {
+          return `idx2crd(${off}) = (${Math.floor(off / cols)}, ${off % cols})`;
+        }
+        if (ex.sTr === 1 && ex.sTc === rows) {
+          return `idx2crd(${off}) = (${off % rows}, ${Math.floor(off / rows)})`;
+        }
+        return "";
+      }
+
+      function renderGrid(ex, size) {
+        const [tr, tc, wr, wc] = ex.sel;
+        const hide = ex.quiz === "indices" && !ex.revealed;
+        const plain = ex.quiz === "layout" && !ex.revealed;
+        if (ex.kind === "windows") return renderWindows(ex);
+        if (ex.kind === "partition") return renderPartition(ex);
+        if (ex.kind === "val2d") return renderVal2d(ex);
+        if (ex.kind === "transpose") return renderTranspose(ex);
+        if (ex.kind === "retile") return renderRetile(ex);
+        if (ex.kind === "mfma") return renderMfma(ex);
+        if (ex.kind === "nest-rows") {
+          const rows = ex.tileR * ex.winR;
+          let html = ticks(rows, "r") + ticks(ex.tileC, "c");
+          for (let r = 0; r < rows; r++) {
+            const inner = r % ex.tileR;
+            const win = Math.floor(r / ex.tileR);
+            for (let c = 0; c < ex.tileC; c++) {
+              const here = offset(ex, inner, c, win, 0);
+              const selected = inner === tr && c === tc && win === wr;
+              html += cellButton(r, c, size, hide ? "" : here, selected ? "selected" : "", `c:${inner},${c},${win},0`, plain ? "#e7f2f8" : color(win));
+            }
+          }
+          return `<div class="matrix" style="grid-template-columns:18px repeat(${ex.tileC},${size}px);grid-template-rows:16px repeat(${rows},${size}px)">${html}</div>`;
+        }
+        if (ex.kind === "tiles") {
+          const cols = ex.tileC * ex.winC;
+          let html = ticks(ex.tileR, "r") + ticks(cols, "c");
+          for (let r = 0; r < ex.tileR; r++) {
+            for (let c = 0; c < cols; c++) {
+              const inner = c % ex.tileC;
+              const win = Math.floor(c / ex.tileC);
+              const here = offset(ex, r, inner, 0, win);
+              const selected = r === tr && inner === tc && win === wc;
+              html += cellButton(r, c, size, hide ? "" : here, selected ? "selected" : "", `c:${r},${inner},0,${win}`, color(win));
+            }
+          }
+          return `<div class="matrix" style="grid-template-columns:18px repeat(${cols},${size}px);grid-template-rows:16px repeat(${ex.tileR},${size}px)">${html}</div>`;
+        }
+        let html = ticks(ex.tileR, "r") + ticks(ex.tileC, "c");
+        for (let r = 0; r < ex.tileR; r++) {
+          for (let c = 0; c < ex.tileC; c++) {
+            const here = offset(ex, r, c, 0, 0);
+            const selected = r === tr && c === tc;
+            const shared = ex.overlap && !hide && !selected && here === offset(ex, tr, tc, wr, wc);
+            const cls = `${selected ? "selected" : ""} ${shared ? "related" : ""}`;
+            const fill = ex.overlap ? color(c) : "#e7f2f8";
+            html += cellButton(r, c, size, hide ? "" : here, cls, `c:${r},${c},0,0`, fill);
+          }
+        }
+        return `<div class="matrix" style="grid-template-columns:18px repeat(${ex.tileC},${size}px);grid-template-rows:16px repeat(${ex.tileR},${size}px)">${html}</div>`;
+      }
+
+      function windowStep(ex) {
+        return [ex.sWr / ex.sTr, ex.sWc / ex.sTc];
+      }
+
+      function renderTiled(ex) {
+        const [kh, kw, oh, ow] = ex.sel;
+        const n = ex.image;
+        const k = ex.tileR;
+        const [stepR, stepC] = windowStep(ex);
+        const size = 36;
+        const paint = (colored) => {
+          let html = ticks(n, "r") + ticks(n, "c");
+          for (let r = 0; r < n; r++) {
+            for (let c = 0; c < n; c++) {
+              const tileR = Math.floor(r / stepR);
+              const tileC = Math.floor(c / stepC);
+              const tap = tileR === oh && tileC === ow && r - tileR * stepR === kh && c - tileC * stepC === kw;
+              const addr = r * ex.sTr + c * ex.sTc;
+              const fill = colored ? color(tileR * ex.winC + tileC) : "#e7f2f8";
+              html += cellButton(r, c, size, addr, tap ? "selected" : "", `i:${r},${c}`, fill);
+            }
+          }
+          return `<div class="matrix" style="grid-template-columns:18px repeat(${n},${size}px);grid-template-rows:16px repeat(${n},${size}px)">${html}</div>`;
+        };
+        return `<div class="pairs side"><div><h3>One window, the ${n}×${n}</h3>${paint(false)}</div><div><h3>Tiled, ${ex.winR * ex.winC} windows of ${k}×${k}</h3>${paint(true)}</div></div>`;
+      }
+
+      function renderOverlap(ex) {
+        const [kh, kw, oh, ow] = ex.sel;
+        const n = ex.image;
+        const k = ex.tileR;
+        const [stepR, stepC] = windowStep(ex);
+        const size = 36;
+        const selectedAddr = offset(ex, kh, kw, oh, ow);
+        let image = ticks(n, "r") + ticks(n, "c");
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            const addr = r * ex.sTr + c * ex.sTc;
+            const here = r === oh * stepR + kh && c === ow * stepC + kw;
+            image += cellButton(r, c, size, addr, here ? "selected" : "", `i:${r},${c}`, "#e7f2f8");
+          }
+        }
+        const imageGrid = `<div class="matrix" style="grid-template-columns:18px repeat(${n},${size}px);grid-template-rows:16px repeat(${n},${size}px)">${image}</div>`;
+        const win = 30;
+        let windows = "";
+        for (let wr = 0; wr < ex.winR; wr++) {
+          for (let wc = 0; wc < ex.winC; wc++) {
+            const fill = color(wr * ex.winC + wc);
+            let cells = "";
+            for (let tr = 0; tr < k; tr++) {
+              for (let tc = 0; tc < k; tc++) {
+                const addr = offset(ex, tr, tc, wr, wc);
+                const selected = tr === kh && tc === kw && wr === oh && wc === ow;
+                const shared = !selected && addr === selectedAddr;
+                const cls = selected ? "selected" : shared ? "related" : "";
+                cells += `<button type="button" class="cell ${cls}" data-c="c:${tr},${tc},${wr},${wc}" style="width:${win}px;height:${win}px;--fill:${fill}"><b>${addr}</b></button>`;
+              }
+            }
+            windows += `<div class="mode-block" style="grid-template-columns:repeat(${k},${win}px)">${cells}</div>`;
+          }
+        }
+        const windowsGrid = `<div class="nest" style="grid-template-columns:repeat(${ex.winC},max-content)">${windows}</div>`;
+        return `<div class="pairs side"><div><h3>One window, the ${n}×${n}</h3>${imageGrid}</div><div><h3>Overlapping, ${ex.winR * ex.winC} windows of ${k}×${k}</h3>${windowsGrid}</div></div>`;
+      }
+
+      function renderWindows(ex) {
+        return ex.overlap ? renderOverlap(ex) : renderTiled(ex);
+      }
+
+      function renderPartition(ex) {
+        const [elem, atom, mTile, nTile] = ex.sel;
+        const size = 22;
+        let tiles = "";
+        for (let m = 0; m < 2; m++) {
+          for (let n = 0; n < 3; n++) {
+            let cells = "";
+            for (let r = 0; r < 4; r++) {
+              for (let c = 0; c < 8; c++) {
+                const addr = (m * 4 + r) * 24 + (n * 8 + c);
+                const owned = r === 0;
+                const a = Math.floor(c / 4);
+                const e = c % 4;
+                const selected = owned && e === elem && a === atom && m === mTile && n === nTile;
+                const cls = selected ? "selected" : owned ? "" : "quiet";
+                const fill = owned ? color(a) : "#f4f7f5";
+                const data = owned ? `c:${e},${a},${m},${n}` : `o:${m},${n},${r},${c}`;
+                cells += `<button type="button" class="cell ${cls}" data-c="${data}" style="width:${size}px;height:${size}px;--fill:${fill}"><b>${addr}</b></button>`;
+              }
+            }
+            tiles += `<div><h3>tile (${m}, ${n})</h3><div class="mode-block dense" style="grid-template-columns:repeat(8,${size}px)">${cells}</div></div>`;
+          }
+        }
+        return `<div class="nest" style="grid-template-columns:repeat(3,max-content)">${tiles}</div>`;
+      }
+
+      function renderVal2d(ex) {
+        const [vCol, vRow, mTile, nTile] = ex.sel;
+        const size = 22;
+        let tiles = "";
+        for (let m = 0; m < 3; m++) {
+          for (let n = 0; n < 2; n++) {
+            let cells = "";
+            for (let r = 0; r < 10; r++) {
+              for (let c = 0; c < 8; c++) {
+                const addr = (m * 10 + r) * 16 + (n * 8 + c);
+                const owned = r < 5 && c < 4;
+                const selected = owned && c === vCol && r === vRow && m === mTile && n === nTile;
+                const cls = selected ? "selected" : owned ? "" : "quiet";
+                const fill = owned ? color(r) : "#f4f7f5";
+                const data = owned ? `c:${c},${r},${m},${n}` : `o:${m},${n},${r},${c}`;
+                cells += `<button type="button" class="cell ${cls}" data-c="${data}" style="width:${size}px;height:${size}px;--fill:${fill}"><b>${addr}</b></button>`;
+              }
+            }
+            tiles += `<div><h3>tile (${m}, ${n})</h3><div class="mode-block dense" style="grid-template-columns:repeat(8,${size}px)">${cells}</div></div>`;
+          }
+        }
+        return `<div class="nest" style="grid-template-columns:repeat(2,max-content)">${tiles}</div>`;
+      }
+
+      function renderTranspose(ex) {
+        const [vSel, rSel, mSel, nSel] = ex.sel;
+        const size = 18;
+        const panel = (which) => {
+          let cells = "";
+          for (let row = 0; row < 40; row++) {
+            const m = row >= 32 ? 1 : 0;
+            const local = row - m * 32;
+            for (let col = 0; col < 12; col++) {
+              const addr = row * 12 + col;
+              let owned = false;
+              let v = 0;
+              let r = 0;
+              let n = 0;
+              if (which === "S") {
+                owned = local < 8 && col % 4 === 0;
+                n = col / 4;
+                r = local % 2;
+                v = Math.floor(local / 2);
+              } else {
+                owned = local < 2;
+                r = local;
+                n = Math.floor(col / 4);
+                v = col % 4;
+              }
+              const selected = owned && v === vSel && r === rSel && m === mSel && n === nSel;
+              const cls = selected ? "selected" : owned ? "" : "quiet";
+              const fill = owned ? color(v) : "#f4f7f5";
+              const data = owned ? `c:${v},${r},${m},${n}` : `o:${row},${col}`;
+              cells += `<button type="button" class="cell ${cls}" data-c="${data}" style="width:${size}px;height:${size}px;--fill:${fill}"><b>${addr}</b></button>`;
+            }
+          }
+          const title = which === "S" ? "partition_S, stride 24" : "partition_D, stride 1";
+          return `<div><h3>${title}, rows 0–39</h3><div class="mode-block dense" style="grid-template-columns:repeat(12,${size}px)">${cells}</div></div>`;
+        };
+        return `<div class="pairs">${panel("S")}${panel("D")}</div>`;
+      }
+
+      function renderRetile(ex) {
+        const [, colSel, groupSel] = ex.sel;
+        const wide = 28;
+        const box = 52;
+        const tensorRow = (row) => {
+          const group = row === 16 ? 1 : 0;
+          let cells = "";
+          for (let col = 0; col < 16; col++) {
+            const addr = row * 16 + col;
+            const owned = col < 4;
+            const selected = owned && col === colSel && group === groupSel;
+            const cls = selected ? "selected" : owned ? "" : "quiet";
+            const fill = owned ? color(col) : "#f4f7f5";
+            const data = owned ? `c:0,${col},${group},0` : `o:${row},${col}`;
+            cells += `<button type="button" class="cell ${cls}" data-c="${data}" style="width:${wide}px;height:${wide}px;--fill:${fill}"><b>${addr}</b></button>`;
+          }
+          return `<div><h3>row ${row}</h3><div class="mode-block dense" style="grid-template-columns:repeat(16,${wide}px)">${cells}</div></div>`;
+        };
+        let regs = "";
+        for (let group = 0; group < 2; group++) {
+          let cells = "";
+          for (let col = 0; col < 4; col++) {
+            const addr = col + group * 256;
+            const reg = col + group * 4;
+            const selected = col === colSel && group === groupSel;
+            cells += `<button type="button" class="cell ${selected ? "selected" : ""}" data-c="c:0,${col},${group},0" style="width:${box}px;height:${box}px;--fill:${color(col)}"><b>${addr}</b><small>r${reg}</small></button>`;
+          }
+          regs += `<div><h3>group ${group}, stride 4</h3><div class="mode-block" style="grid-template-columns:repeat(4,${box}px)">${cells}</div></div>`;
+        }
+        const tensor = `<div><h3>partition_S, the tensor</h3>${tensorRow(0)}<p class="stride-hint">rows 1–15 · 240 addresses · the next row starts at 256</p>${tensorRow(16)}</div>`;
+        const registers = `<div><h3>retile, the registers</h3>${regs}</div>`;
+        return `<div class="pairs">${tensor}${registers}</div>`;
+      }
+
+      function renderMfma(ex) {
+        const [rowSel, groupSel, valSel] = ex.sel;
+        const size = 36;
+        let cells = ticks(16, "r") + ticks(16, "c");
+        for (let row = 0; row < 16; row++) {
+          for (let col = 0; col < 16; col++) {
+            const group = Math.floor(col / 4);
+            const value = col % 4;
+            const lane = row + group * 16;
+            const selected = row === rowSel && group === groupSel && value === valSel;
+            cells += `<button type="button" class="cell ${selected ? "selected" : ""}" data-c="c:${row},${group},${value},0" style="grid-row:${row + 2};grid-column:${col + 2};width:${size}px;height:${size}px;--fill:${color(value)}"><b>${lane}</b><small>v${value}</small></button>`;
+          }
+        }
+        return `<div class="matrix" style="grid-template-columns:18px repeat(16,${size}px);grid-template-rows:16px repeat(16,${size}px)">${cells}</div>`;
+      }
+
+      function visit(ex, fn) {
+        if (ex.kind === "partition") {
+          for (let m = 0; m < 2; m++) {
+            for (let n = 0; n < 3; n++) {
+              for (let atom = 0; atom < 2; atom++) {
+                for (let elem = 0; elem < 4; elem++) {
+                  fn(offset(ex, elem, atom, m, n), `c:${elem},${atom},${m},${n}`, color(atom));
+                }
+              }
+            }
+          }
+          return;
+        }
+        if (ex.kind === "windows") {
+          for (let r = 0; r < ex.image; r++) {
+            for (let c = 0; c < ex.image; c++) fn(r * ex.sTr + c * ex.sTc, `i:${r},${c}`, "white");
+          }
+          return;
+        }
+        if (ex.kind === "nest-rows") {
+          const rows = ex.tileR * ex.winR;
+          for (let r = 0; r < rows; r++) {
+            const inner = r % ex.tileR;
+            const win = Math.floor(r / ex.tileR);
+            for (let c = 0; c < ex.tileC; c++) fn(offset(ex, inner, c, win, 0), `c:${inner},${c},${win},0`, color(win));
+          }
+          return;
+        }
+        if (ex.kind === "tiles") {
+          const cols = ex.tileC * ex.winC;
+          for (let r = 0; r < ex.tileR; r++) {
+            for (let c = 0; c < cols; c++) {
+              const inner = c % ex.tileC;
+              const win = Math.floor(c / ex.tileC);
+              fn(offset(ex, r, inner, 0, win), `c:${r},${inner},0,${win}`, color(win));
+            }
+          }
+          return;
+        }
+        for (let r = 0; r < ex.tileR; r++) {
+          for (let c = 0; c < ex.tileC; c++) fn(offset(ex, r, c, 0, 0), `c:${r},${c},0,0`, "#e7f2f8");
+        }
+      }
+
+      function renderMemory(ex) {
+        const [tr, tc, wr, wc] = ex.sel;
+        const selected = offset(ex, tr, tc, wr, wc);
+        const slots = new Map();
+        visit(ex, (addr, data, fill) => {
+          if (!slots.has(addr)) slots.set(addr, { data, fill });
+        });
+        if (ex.overlap && ex.kind !== "windows") {
+          for (let tap = 0; tap < ex.tileR; tap++) {
+            const addr = offset(ex, tap, tc, 0, 0);
+            const slot = slots.get(addr);
+            if (slot) slot.fill = color(tc);
+          }
+        }
+        if (ex.kind === "windows") {
+          const [stepR, stepC] = windowStep(ex);
+          if (ex.overlap) {
+            const fill = color(wr * ex.winC + wc);
+            for (let tr = 0; tr < ex.tileR; tr++) {
+              for (let tc2 = 0; tc2 < ex.tileC; tc2++) {
+                const slot = slots.get(offset(ex, tr, tc2, wr, wc));
+                if (slot) slot.fill = fill;
+              }
+            }
+          } else {
+            for (let r = 0; r < ex.image; r++) {
+              for (let c = 0; c < ex.image; c++) {
+                const tile = Math.floor(r / stepR) * ex.winC + Math.floor(c / stepC);
+                const slot = slots.get(r * ex.sTr + c * ex.sTc);
+                if (slot) slot.fill = color(tile);
+              }
+            }
+          }
+        }
+        const last = Math.max(0, ...slots.keys());
+        let html = "";
+        for (let addr = 0; addr <= last; addr++) {
+          const slot = slots.get(addr);
+          const cls = addr === selected ? "selected" : slot ? "" : "gap";
+          const fill = slot ? slot.fill : "transparent";
+          const data = slot ? slot.data : "";
+          html += `<button type="button" class="${cls}" data-c="${data}" style="--fill:${fill};background:${fill}" ${slot ? "" : "disabled"}>${addr}</button>`;
+        }
+        return html;
+      }
+
+      function stepsFor(ex) {
+        if (ex.quiz === "indices" && !ex.revealed) {
+          return [{ label: "Question", code: ex.printed, text: "The layout is given. Write the offset in each cell." }];
+        }
+        if (ex.quiz === "tiles" && !ex.revealed) {
+          const text = ex.kind === "transpose"
+            ? "Source and dest have the same shape. Only the stride of the 4 changes. Show the tiles."
+            : ex.kind === "val2d"
+            ? "This is partition_S. The 4, the 5, the 3, and the 2 are different modes. Show the tiles."
+            : "The layout is given. (4, 2) runs along one row. Show the tiles.";
+          return [{ label: "Question", code: ex.printed, text }];
+        }
+        if (ex.quiz === "layout" && !ex.revealed) {
+          const text = ex.kind === "mfma"
+            ? "Lane and value are filled in. A column is contiguous. Write the layout."
+            : "The offsets are filled in. Write the layout that prints them.";
+          return [{ label: "Question", code: "shape : stride = ?", text }];
+        }
+        const [tr, tc, wr, wc] = ex.sel;
+        const off = offset(ex, tr, tc, wr, wc);
+        if (ex.kind === "flat") {
+          const back = idx2crdLine(ex, off);
+          const steps = [
+            { label: "Row", code: `${tr} × ${ex.sTr} = ${tr * ex.sTr}`, text: "Mode 0, the left one." },
+            { label: "Column", code: `${tc} × ${ex.sTc} = ${tc * ex.sTc}`, text: "Mode 1." },
+            { label: "Offset", code: `${tr * ex.sTr} + ${tc * ex.sTc} = ${off}`, text: back || "The sum is the offset." },
+          ];
+          return steps;
+        }
+        if (ex.kind === "nest-rows") {
+          const row = tr + wr * ex.tileR;
+          return [
+            { label: "Inside the row pair", code: `${tr} × ${ex.sTr} = ${tr * ex.sTr}`, text: `The pair's left mode. This cell is row-group ${wr}.` },
+            { label: "Which group", code: `${wr} × ${ex.sWr} = ${wr * ex.sWr}`, text: "The pair's right mode. One step of that mode is the next group of rows." },
+            { label: "Column", code: `${tc} × ${ex.sTc} = ${tc * ex.sTc}`, text: `The outside mode. Row ${row} opens as (${tr}, ${wr}).` },
+            { label: "Offset", code: `${tr * ex.sTr} + ${wr * ex.sWr} + ${tc * ex.sTc} = ${off}`, text: `Coordinate ((${tr}, ${wr}), ${tc}) is this cell.` },
+          ];
+        }
+        if (ex.kind === "transpose") {
+          const src = tr * ex.sTr + tc * ex.sTc + wr * ex.sWr + wc * ex.sWc;
+          const dst = tr * ex.dTr + tc * ex.dTc + wr * ex.dWr + wc * ex.dWc;
+          return [
+            { label: "One copy, source", code: `${tr} × ${ex.sTr} = ${tr * ex.sTr}`, text: "The 4 on partition_S. Same column, two rows down. Two rows times the width 12 is 24." },
+            { label: "One copy, dest", code: `${tr} × ${ex.dTr} = ${tr * ex.dTr}`, text: "The same 4 on partition_D. Four consecutive columns, stride 1." },
+            { label: "Value row", code: `${tc} × ${ex.sTc} = ${tc * ex.sTc}`, text: "The inner 2. Both layouts step one row of the 12-wide block." },
+            { label: "Tile down", code: `${wr} × ${ex.sWr} = ${wr * ex.sWr}`, text: "The other 2. The tile is 32 rows, and 32 × 12 is 384." },
+            { label: "Tile across", code: `${wc} × ${ex.sWc} = ${wc * ex.sWc}`, text: "The 3. The tile is 4 columns wide." },
+            { label: "Offsets", code: `S ${src} · D ${dst}`, text: `Coordinate ((${tr}, ${tc}), ${wr}, ${wc}). Same coordinate, two addresses.` },
+          ];
+        }
+        if (ex.kind === "mfma") {
+          const lane = tr + tc * 16;
+          return [
+            { label: "Lane row", code: `${tr} × 1 = ${tr}`, text: `Sixteen lanes down the column, stride 1. This is lane ${lane}.` },
+            { label: "Lane group", code: `${tc} × 64 = ${tc * 64}`, text: "The 4 beside the 16. Each group owns four columns, and one column is 16 long, so the step is 64." },
+            { label: "Value", code: `${wr} × 16 = ${wr * 16}`, text: "The last 4. The next value is the next column." },
+            { label: "Offset", code: `${tr} + ${tc * 64} + ${wr * 16} = ${off}`, text: `Coordinate ((${tr}, ${tc}), ${wr}). Column-major, so the column is contiguous.` },
+          ];
+        }
+        if (ex.kind === "retile") {
+          const reg = tc * ex.dTc + wr * ex.dWr;
+          return [
+            { label: "Column", code: `${tc} × 1 = ${tc}`, text: "The 4. One step along the row, and one step to the next register. Stride 1 in both." },
+            { label: "Group, tensor", code: `${wr} × 256 = ${wr * 256}`, text: "The 2 on partition_S. Sixteen rows of sixteen is 256." },
+            { label: "Group, registers", code: `${wr} × 4 = ${reg}`, text: "The same 2 on retile. Four registers, then the next four." },
+            { label: "Together", code: `tensor ${off} · r${reg}`, text: `Coordinate ((0, ${tc}), ${wr}, 0). The number in the register is the tensor address.` },
+          ];
+        }
+        if (ex.kind === "val2d") {
+          return [
+            { label: "Value column", code: `${tr} × ${ex.sTr} = ${tr * ex.sTr}`, text: "The 4. Four consecutive columns, stride 1." },
+            { label: "Value row", code: `${tc} × ${ex.sTc} = ${tc * ex.sTc}`, text: "The 5. The next row of the 16-wide block, so the stride is 16." },
+            { label: "Tile down", code: `${wr} × ${ex.sWr} = ${wr * ex.sWr}`, text: "The 3. The tile is 10 rows, and 10 × 16 is 160." },
+            { label: "Tile across", code: `${wc} × ${ex.sWc} = ${wc * ex.sWc}`, text: "The 2. The tile is 8 columns wide." },
+            { label: "Offset", code: `${tr * ex.sTr} + ${tc * ex.sTc} + ${wr * ex.sWr} + ${wc * ex.sWc} = ${off}`, text: `Coordinate ((${tr}, ${tc}), ${wr}, ${wc}).` },
+          ];
+        }
+        if (ex.kind === "partition") {
+          return [
+            { label: "Inside one copy", code: `${tr} × ${ex.sTr} = ${tr * ex.sTr}`, text: "The 4 in (4, 2). Four contiguous columns of this thread's row." },
+            { label: "Which copy", code: `${tc} × ${ex.sTc} = ${tc * ex.sTc}`, text: "The 2 in (4, 2). Same row, the next four columns. Both modes run along N." },
+            { label: "Which group of eight", code: `${wc} × ${ex.sWc} = ${wc * ex.sWc}`, text: "The mode of shape 3. Three of these cover the row." },
+            { label: "Which row of this thread", code: `${wr} × ${ex.sWr} = ${wr * ex.sWr}`, text: "The mode of shape 2. Row 4 is 4 × 24 = 96." },
+            { label: "Offset", code: `${tr * ex.sTr} + ${tc * ex.sTc} + ${wc * ex.sWc} + ${wr * ex.sWr} = ${off}`, text: `Coordinate ((${tr}, ${tc}), ${wr}, ${wc}).` },
+          ];
+        }
+        if (ex.kind === "tiles") {
+          const col = tc + wc * ex.tileC;
+          return [
+            { label: "Inside the pair", code: `column ${tc} × ${ex.sTc} = ${tc * ex.sTc}`, text: `The pair's left mode. This cell is column-group ${wc}.` },
+            { label: "Which group", code: `${wc} × ${ex.sWc} = ${wc * ex.sWc}`, text: "The pair's right mode. One step of that mode is the next group." },
+            { label: "Row", code: `${tr} × ${ex.sTr} = ${tr * ex.sTr}`, text: `The outside mode. Column ${col} is the flat column index, ${tc} + ${wc}×${ex.tileC}.` },
+            { label: "Offset", code: `${tr * ex.sTr} + ${tc * ex.sTc} + ${wc * ex.sWc} = ${off}`, text: `Coordinate (${tr}, ${col}) and the opened pair are the same call.` },
+          ];
+        }
+        const a = tr + tc * ex.tileR;
+        const b = wr + wc * ex.winR;
+        if (ex.quiz === "strides" && !ex.strideOk) {
+          return [
+            { label: "Inside the window", code: `(${tr}, ${tc})`, text: "The first pair. Its strides are the first blank." },
+            { label: "Which window", code: `(${wr}, ${wc})`, text: "The second pair. Its strides are the second blank." },
+            { label: "Offset", code: String(off), text: "The number in the outlined cell. Each coordinate times its stride, then add." },
+          ];
+        }
+        return [
+          { label: "Inside the 3×3", code: `${a} = ${tr} + ${tc}×${ex.tileR}`, text: `Integer ${a} opens as (${tr}, ${tc}). Strides (${ex.sTr}, ${ex.sTc}) contribute ${tr * ex.sTr + tc * ex.sTc}.` },
+          { label: "Which window", code: `${b} = ${wr} + ${wc}×${ex.winR}`, text: `Integer ${b} opens as (${wr}, ${wc}). Strides (${ex.sWr}, ${ex.sWc}) contribute ${wr * ex.sWr + wc * ex.sWc}.` },
+          { label: "Offset", code: `${tr * ex.sTr + tc * ex.sTc} + ${wr * ex.sWr + wc * ex.sWc} = ${off}`, text: `Image row ${wr * (ex.sWr / ex.sTr)}+${tr} = ${wr * (ex.sWr / ex.sTr) + tr}, column ${wc * (ex.sWc / ex.sTc)}+${tc} = ${wc * (ex.sWc / ex.sTc) + tc}.` },
+        ];
+      }
+
+      function codeFor(ex) {
+        const [tr, tc, wr, wc] = ex.sel;
+        const off = offset(ex, tr, tc, wr, wc);
+        if (ex.kind === "flat") {
+          const line = `layout = fx.make_layout((${ex.tileR}, ${ex.tileC}), (${ex.sTr}, ${ex.sTc}))`;
+          if (ex.quiz === "indices" && !ex.revealed) return `${line}\n# the offsets stay hidden`;
+          const back = idx2crdLine(ex, off);
+          return `${line}\nfx.crd2idx((${tr}, ${tc}), layout)  # ${off}${back ? "\nfx." + back : ""}`;
+        }
+        if (ex.kind === "nest-rows") {
+          const line = `layout = fx.make_layout(((2, 2), 2), ((4, 1), 2))`;
+          if (ex.quiz === "layout" && !ex.revealed) return "# the table is the question";
+          return `${line}\nfx.crd2idx(((${tr}, ${wr}), ${tc}), layout)  # ${off}`;
+        }
+        if (ex.kind === "transpose") {
+          const src = tr * ex.sTr + tc * ex.sTc + wr * ex.sWr + wc * ex.sWc;
+          const dst = tr * ex.dTr + tc * ex.dTc + wr * ex.dWr + wc * ex.dWc;
+          const line = `thr = fx.make_layout((16, 1), (1, 0))
+val = fx.make_layout((2, 4), (4, 1))
+tile_mn, tv = fx.make_layout_tv(thr, val)
+atom = fx.make_copy_atom(fx.rocdl.cdna4.LDSReadTrans16_64b(), fx.Float16)
+tiled = fx.make_tiled_copy(atom, tv, tile_mn)
+block = fx.make_rmem_tensor(fx.make_ordered_layout((64, 12), (1, 0)), fx.Float16)
+pS = tiled.get_slice(tid).partition_S(block)
+pD = tiled.get_slice(tid).partition_D(block)`;
+          if (ex.quiz === "tiles" && !ex.revealed) return `${line}\n# pS ((4, 2), 2, 3):((24, 12), 384, 4)\n# pD ((4, 2), 2, 3):((1, 12), 384, 4)`;
+          return `${line}\n# ((${tr}, ${tc}), ${wr}, ${wc}) -> S ${src}, D ${dst}`;
+        }
+        if (ex.kind === "mfma") {
+          const line = `layout = fx.make_layout(((16, 4), 4), ((1, 64), 16))`;
+          if (ex.quiz === "layout" && !ex.revealed) return "# the tile is the question";
+          return `${line}\nfx.crd2idx(((${tr}, ${tc}), ${wr}), layout)  # ${off}`;
+        }
+        if (ex.kind === "retile") {
+          const reg = tc * ex.dTc + wr * ex.dWr;
+          return `frag = thr_mma.make_fragment_A(tile)
+pS = thr_buf.partition_S(tile)
+view = thr_buf.retile(frag)
+# ((0, ${tc}), ${wr}, 0)
+# tensor ${off}    register r${reg}`;
+        }
+        if (ex.kind === "val2d") {
+          const line = `thr = fx.make_layout((2, 2), (2, 1))
+val = fx.make_layout((5, 4), (4, 1))
+tile_mn, tv = fx.make_layout_tv(thr, val)
+atom = fx.make_copy_atom(fx.UniversalCopy128b(), fx.Float32)
+tiled = fx.make_tiled_copy(atom, tv, tile_mn)
+block = fx.make_rmem_tensor(fx.make_ordered_layout((30, 16), (1, 0)), fx.Float32)
+pS = tiled.get_slice(tid).partition_S(block)`;
+          if (ex.quiz === "tiles" && !ex.revealed) return `${line}\n# pS is ((4, 5), 3, 2):((1, 16), 160, 8)`;
+          return `${line}\n# ((${tr}, ${tc}), ${wr}, ${wc}) -> ${off}`;
+        }
+        if (ex.kind === "partition") {
+          const line = `thr = fx.make_layout((4, 1), (1, 1))
+val = fx.make_layout((1, 8), (1, 1))
+tile_mn, tv = fx.make_layout_tv(thr, val)
+atom = fx.make_copy_atom(fx.UniversalCopy128b(), fx.Float32)
+tiled = fx.make_tiled_copy(atom, tv, tile_mn)
+block = fx.make_rmem_tensor(fx.make_ordered_layout((8, 24), (1, 0)), fx.Float32)
+pS = tiled.get_slice(tid).partition_S(block)`;
+          if (ex.quiz === "tiles" && !ex.revealed) return `${line}\n# pS is ((4, 2), 2, 3):((1, 4), 96, 8)`;
+          return `${line}\n# ((${tr}, ${tc}), ${wr}, ${wc}) -> ${off}`;
+        }
+        if (ex.kind === "tiles") {
+          const col = tc + wc * ex.tileC;
+          const shape = `(${ex.tileR}, (${ex.tileC}, ${ex.winC}))`;
+          const stride = `(${ex.sTr}, (${ex.sTc}, ${ex.sWc}))`;
+          const line = `layout = fx.make_layout(${shape}, ${stride})`;
+          if (ex.quiz === "indices" && !ex.revealed) return `${line}\n# the offsets stay hidden`;
+          return `${line}\nfx.crd2idx((${tr}, ${col}), layout)  # ${off}`;
+        }
+        const a = tr + tc * ex.tileR;
+        const b = wr + wc * ex.winR;
+        if (ex.quiz === "strides" && !ex.strideOk) {
+          return `layout = fx.make_layout(((${ex.tileR}, ${ex.tileC}), (${ex.winR}, ${ex.winC})), ((?, ?), (?, ?)))\n# write the strides`;
+        }
+        const line = `layout = fx.make_layout(((${ex.tileR}, ${ex.tileC}), (${ex.winR}, ${ex.winC})), ((${ex.sTr}, ${ex.sTc}), (${ex.sWr}, ${ex.sWc})))`;
+        if (ex.quiz === "indices" && !ex.revealed) return `${line}\n# the offsets stay hidden`;
+        return `${line}\nfx.crd2idx(((${tr}, ${tc}), (${wr}, ${wc})), layout)  # ${off}\nfx.crd2idx((${a}, ${b}), layout)  # ${off}`;
+      }
+
+      function render() {
+        const ex = current;
+        const [tr, tc, wr, wc] = ex.sel;
+        const off = offset(ex, tr, tc, wr, wc);
+        const size = 46;
+        const hideIdx = ex.quiz === "indices" && !ex.revealed;
+        const hideLayout = ex.quiz === "layout" && !ex.revealed;
+        const hideTiles = ex.quiz === "tiles" && !ex.revealed;
+        const hideStrides = ex.quiz === "strides" && !ex.strideOk;
+        const reveal = document.getElementById("reveal");
+        reveal.hidden = ex.quiz !== "indices" && ex.quiz !== "layout" && ex.quiz !== "tiles" && ex.quiz !== "strides";
+        reveal.textContent = ex.revealed ? "Hide the answer" : "Show the answer";
+        paintStrideQuiz(ex);
+        document.querySelector(".workspace").classList.toggle("stack", ex.kind === "windows" || ex.kind === "partition" || ex.kind === "val2d" || ex.kind === "transpose" || ex.kind === "retile" || ex.kind === "mfma");
+        const printed = document.getElementById("layout-printed");
+        printed.classList.toggle("pair", (ex.kind === "transpose" || ex.kind === "retile") && !hideLayout);
+        printed.textContent = hideLayout ? "?" : ex.printed;
+        document.getElementById("example-note").textContent = ex.kind === "windows"
+          ? `${ex.note} Outlined cell: tap (${tr}, ${tc}) of window (${wr}, ${wc}), offset ${off}.`
+          : ex.note;
+        document.getElementById("grid-title").textContent = ex.kind === "windows" ? (ex.overlap ? "One image, then the windows" : "One image, then the tiles") : ex.kind === "partition" ? (hideTiles ? "Layout" : "4×8 tile, twice down and three across") : ex.kind === "val2d" ? (hideTiles ? "Layout" : "10×8 tile, three down and two across") : ex.kind === "transpose" ? (hideTiles ? "Layout" : "Same coordinate, two addresses") : ex.kind === "retile" ? "Tensor, then the same values in registers" : ex.kind === "mfma" ? "16×16, lane then value" : ex.kind === "nest-rows" ? "Rows are the nested pair" : ex.kind === "tiles" ? "One table, columns grouped" : "Layout";
+        document.getElementById("grid-note").textContent = hideLayout || hideStrides || hideTiles ? "" : ex.printed;
+        document.getElementById("grid-foot").textContent = hideTiles
+          ? "The tiles stay hidden. The layout is the question."
+          : hideIdx
+          ? "The offsets are hidden. The ticks are the coordinate."
+          : hideLayout
+            ? ex.kind === "mfma"
+              ? "Top number is the lane. Bottom number is its value. Write the layout."
+              : "The offsets are filled in. The layout is hidden."
+              : ex.kind === "windows"
+              ? ex.overlap
+                ? "Left is the image. Right, each color is one window, and the windows overlap. The number is the offset."
+                : "Left is one window, the whole image. Right is that image cut into tiles. The number is the offset in both."
+              : ex.kind === "partition"
+                ? "Each box is one 4×8 tile. Every number is the address in the 8×24 block. Color is this thread's row of that tile. The next row of boxes starts 96 elements later because four rows of 24 sit in between."
+              : ex.kind === "val2d"
+                ? "Each box is one 10×8 tile of the 30×16 block. Color is this thread's 5×4: four columns, then the row 16 later. Pale cells belong to the other three threads."
+              : ex.kind === "transpose"
+                ? "Left is where the 4 f16 are read. Right is where they land. Color is one copy. Rows 8–31 are the other threads, drawn pale. The next colored band is row 32, offset 384."
+              : ex.kind === "retile"
+                ? "Left is the tensor. The colored four are this thread. Rows 1–15 are the gap, so the next row starts at 256. Right, those eight values sit in r0–r7, and the next group starts at r4."
+              : ex.kind === "mfma"
+                ? "Color is the value, 0–3. One lane owns four cells in a row. The next lane down the column is the next number, because the column is contiguous."
+              : ex.kind === "nest-rows"
+                ? "Color is the nested row pair. The next group of rows starts one element over."
+                : ex.kind === "tiles"
+                  ? "Same table as print_layout. Color is the nested column pair."
+                  : ex.overlap
+                    ? "Each column is a window. A dashed cell is another coordinate with this same offset."
+                    : "Click a cell. The number is the offset.";
+        document.getElementById("cell-name").textContent = hideIdx || hideTiles
+          ? ""
+          : ex.kind === "flat"
+            ? `(${tr}, ${tc})`
+            : ex.kind === "tiles"
+              ? `(${tr}, ${tc + wc * ex.tileC})`
+              : ex.kind === "nest-rows"
+                ? `((${tr}, ${wr}), ${tc})`
+                : ex.kind === "partition"
+                  ? `((${tr}, ${tc}), ${wr}, ${wc})`
+                  : ex.kind === "val2d" || ex.kind === "transpose"
+                    ? `((${tr}, ${tc}), ${wr}, ${wc})`
+                  : ex.kind === "retile"
+                    ? `((0, ${tc}), ${wr}, 0)`
+                  : ex.kind === "mfma"
+                    ? `((${tr}, ${tc}), ${wr})`
+                    : `((${tr}, ${tc}), (${wr}, ${wc}))`;
+        document.getElementById("grid-map").innerHTML = hideTiles
+          ? `<p class="stride-hint">Show the tiles.</p>`
+          : renderGrid(ex, size);
+        const hideMemory = hideIdx || hideTiles || ex.kind === "partition" || ex.kind === "val2d" || ex.kind === "transpose" || ex.kind === "retile" || ex.kind === "mfma";
+        document.querySelector(".memory").hidden = hideMemory;
+        if (!hideMemory) document.getElementById("memory").innerHTML = renderMemory(ex);
+        paintSteps(stepsFor(ex));
+        if (hideIdx || hideLayout || hideTiles) {
+          document.getElementById("step-coord").textContent = hideLayout ? "indices" : ex.printed;
+          document.getElementById("step-coord-note").textContent = hideLayout ? "the table" : "given";
+          document.getElementById("step-sum").textContent = "?";
+          document.getElementById("step-sum-note").textContent = hideTiles ? "the tiles are hidden" : hideLayout ? "the layout is hidden" : "the offsets are hidden";
+          document.getElementById("step-off").textContent = hideLayout ? "shown" : "?";
+          document.getElementById("step-off-note").textContent = "";
+          document.getElementById("route-summary").textContent = hideTiles
+            ? "The layout is on the title line. Show the tiles."
+            : hideLayout
+            ? "Read the table, then show the layout."
+            : "The layout is on the title line. Show the indices when the room has an answer.";
+          document.getElementById("code").textContent = codeFor(ex);
+          document.querySelectorAll("#examples button").forEach((button) => {
+            button.setAttribute("aria-pressed", button.dataset.id === ex.id ? "true" : "false");
+          });
+          return;
+        }
+        if (ex.kind === "flat") {
+          document.getElementById("step-coord").textContent = `(${tr}, ${tc})`;
+          document.getElementById("step-coord-note").textContent = "row, column";
+          document.getElementById("step-sum").textContent = `${tr * ex.sTr} + ${tc * ex.sTc}`;
+          document.getElementById("step-sum-note").textContent = ex.printed;
+        } else if (ex.kind === "tiles") {
+          const col = tc + wc * ex.tileC;
+          document.getElementById("step-coord").textContent = `(${tr}, ${col})`;
+          document.getElementById("step-coord-note").textContent = `opens inside (${ex.tileC}, ${ex.winC}) as column ${tc} of group ${wc}`;
+          document.getElementById("step-sum").textContent = `${tr * ex.sTr} + ${tc * ex.sTc} + ${wc * ex.sWc}`;
+          document.getElementById("step-sum-note").textContent = ex.printed;
+        } else if (ex.kind === "mfma") {
+          document.getElementById("step-coord").textContent = `((${tr}, ${tc}), ${wr})`;
+          document.getElementById("step-coord-note").textContent = `lane ${tr + tc * 16}, value ${wr}`;
+          document.getElementById("step-sum").textContent = `${tr} × 1 + ${tc} × 64 + ${wr} × 16`;
+          document.getElementById("step-sum-note").textContent = ex.printed;
+        } else if (ex.kind === "retile") {
+          const reg = tc * ex.dTc + wr * ex.dWr;
+          document.getElementById("step-coord").textContent = `((0, ${tc}), ${wr}, 0)`;
+          document.getElementById("step-coord-note").textContent = "one element, column, group, K";
+          document.getElementById("step-sum").textContent = `${tc} × 1 + ${wr} × 256    ·    ${tc} × 1 + ${wr} × 4`;
+          document.getElementById("step-sum-note").textContent = `tensor ${off}, register r${reg}`;
+        } else if (ex.kind === "transpose") {
+          const dst = tr * ex.dTr + tc * ex.dTc + wr * ex.dWr + wc * ex.dWc;
+          document.getElementById("step-coord").textContent = `((${tr}, ${tc}), ${wr}, ${wc})`;
+          document.getElementById("step-coord-note").textContent = "copy element, value row, tile down, tile across";
+          document.getElementById("step-sum").textContent = `${tr * ex.sTr} + ${tc * ex.sTc} + ${wr * ex.sWr} + ${wc * ex.sWc}  ·  ${tr * ex.dTr} + ${tc * ex.dTc} + ${wr * ex.dWr} + ${wc * ex.dWc}`;
+          document.getElementById("step-sum-note").textContent = `source ${off}, dest ${dst}`;
+        } else if (ex.kind === "val2d") {
+          document.getElementById("step-coord").textContent = `((${tr}, ${tc}), ${wr}, ${wc})`;
+          document.getElementById("step-coord-note").textContent = "value column, value row, tile down, tile across";
+          document.getElementById("step-sum").textContent = `${tr * ex.sTr} + ${tc * ex.sTc} + ${wr * ex.sWr} + ${wc * ex.sWc}`;
+          document.getElementById("step-sum-note").textContent = ex.printed;
+        } else if (ex.kind === "partition") {
+          document.getElementById("step-coord").textContent = `((${tr}, ${tc}), ${wr}, ${wc})`;
+          document.getElementById("step-coord-note").textContent = "copy element, copy, row tile, column tile";
+          document.getElementById("step-sum").textContent = `${tr * ex.sTr} + ${tc * ex.sTc} + ${wc * ex.sWc} + ${wr * ex.sWr}`;
+          document.getElementById("step-sum-note").textContent = ex.printed;
+        } else if (ex.kind === "nest-rows") {
+          document.getElementById("step-coord").textContent = `((${tr}, ${wr}), ${tc})`;
+          document.getElementById("step-coord-note").textContent = `row ${tr + wr * ex.tileR} opens as (${tr}, ${wr})`;
+          document.getElementById("step-sum").textContent = `${tr * ex.sTr} + ${wr * ex.sWr} + ${tc * ex.sTc}`;
+          document.getElementById("step-sum-note").textContent = ex.printed;
+        } else {
+          const a = tr + tc * ex.tileR;
+          const b = wr + wc * ex.winR;
+          document.getElementById("step-coord").textContent = `(${a}, ${b})`;
+          document.getElementById("step-coord-note").textContent = `opens as ((${tr}, ${tc}), (${wr}, ${wc}))`;
+          document.getElementById("step-sum").textContent = hideStrides ? "?" : `${tr * ex.sTr + tc * ex.sTc} + ${wr * ex.sWr + wc * ex.sWc}`;
+          document.getElementById("step-sum-note").textContent = hideStrides ? "the strides are blank" : `strides ((${ex.sTr}, ${ex.sTc}), (${ex.sWr}, ${ex.sWc}))`;
+        }
+        const dstOff = ex.kind === "transpose" || ex.kind === "retile" ? tr * ex.dTr + tc * ex.dTc + wr * ex.dWr + wc * ex.dWc : off;
+        document.getElementById("step-off").textContent = ex.kind === "transpose" ? `${off} · ${dstOff}` : ex.kind === "retile" ? `${off} · r${dstOff}` : String(off);
+        document.getElementById("step-off-note").textContent = ex.kind === "transpose" ? "source, then dest" : ex.kind === "retile" ? "tensor address, then register" : "crd2idx";
+        document.getElementById("route-summary").textContent = hideStrides
+          ? "The picture shows the offsets. Write the strides, then check."
+          : ex.kind === "transpose"
+            ? `Same coordinate. Source ${off}, dest ${dstOff}.`
+          : ex.kind === "retile"
+            ? `Same coordinate. Tensor address ${off}, register r${dstOff}.`
+          : ex.kind === "windows"
+            ? `(${tr + tc * ex.tileR}, ${wr + wc * ex.winR}) and ((${tr}, ${tc}), (${wr}, ${wc})) are the same call. Both are offset ${off}.`
+            : `This coordinate maps to offset ${off}.`;
+        document.getElementById("code").textContent = codeFor(ex);
+        document.querySelectorAll("#examples button").forEach((button) => {
+          button.setAttribute("aria-pressed", button.dataset.id === ex.id ? "true" : "false");
+        });
+      }
+
+      const strideIds = ["s-tr", "s-tc", "s-wr", "s-wc"];
+      let strideExample = null;
+
+      function paintStrideQuiz(ex) {
+        const box = document.getElementById("stride-quiz");
+        const on = ex.quiz === "strides";
+        box.hidden = !on;
+        document.getElementById("layout-printed").hidden = on && !ex.strideOk;
+        if (!on) return;
+        document.getElementById("stride-shape").textContent = `((${ex.tileR}, ${ex.tileC}), (${ex.winR}, ${ex.winC}))`;
+        const want = [ex.sTr, ex.sTc, ex.sWr, ex.sWc].map(String);
+        const draft = ex.draft || ["", "", "", ""];
+        if (strideExample !== ex.id) {
+          strideIds.forEach((id, i) => { document.getElementById(id).value = draft[i]; });
+          strideExample = ex.id;
+        }
+        strideIds.forEach((id, i) => {
+          const input = document.getElementById(id);
+          input.classList.toggle("bad", !!ex.checked && !ex.strideOk && input.value.trim() !== want[i]);
+          input.classList.toggle("ok", !!ex.strideOk);
+        });
+        const verdict = document.getElementById("stride-verdict");
+        verdict.textContent = ex.checked ? (ex.strideOk ? "Okay" : "Not okay") : "";
+        verdict.className = ex.strideOk ? "ok" : ex.checked ? "bad" : "";
+      }
+
+      function checkStrides() {
+        const ex = current;
+        if (ex.quiz !== "strides") return;
+        const got = strideIds.map((id) => document.getElementById(id).value.trim());
+        ex.draft = got;
+        const want = [ex.sTr, ex.sTc, ex.sWr, ex.sWc].map(String);
+        ex.checked = true;
+        ex.strideOk = got.every((value, i) => value === want[i]);
+        render();
+      }
+
+      function selectExample(id) {
+        const next = byId[id] || examples[0];
+        if (next !== current) {
+          next.revealed = false;
+          next.strideOk = false;
+          next.checked = false;
+          next.draft = ["", "", "", ""];
+        }
+        current = next;
+        history.replaceState(null, "", `#${current.id}`);
+        render();
+      }
+
+      document.getElementById("examples").innerHTML = examples
+        .map((ex) => `<button type="button" data-id="${ex.id}">${ex.label}</button>`)
+        .join("");
+      document.getElementById("examples").addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (button) selectExample(button.dataset.id);
+      });
+      document.getElementById("grid-map").addEventListener("click", onGridClick);
+      document.getElementById("memory").addEventListener("click", onGridClick);
+      function onGridClick(event) {
+        const button = event.target.closest("button[data-c]");
+        if (!button) return;
+        const [kind, rest] = button.dataset.c.split(":");
+        const parts = rest.split(",").map(Number);
+        if (kind === "o") return;
+        if (kind === "w") {
+          current.sel = [current.sel[0], current.sel[1], parts[0], parts[1]];
+        } else if (kind === "i") {
+          const [h, w] = parts;
+          let [kh, kw, oh, ow] = current.sel;
+          const k = current.tileR;
+          const [stepR, stepC] = windowStep(current);
+          const originR = oh * stepR;
+          const originC = ow * stepC;
+          const inside = h >= originR && h < originR + k && w >= originC && w < originC + k;
+          if (!inside) {
+            oh = Math.min(current.winR - 1, Math.max(0, Math.floor(h / stepR)));
+            ow = Math.min(current.winC - 1, Math.max(0, Math.floor(w / stepC)));
+            kh = Math.min(k - 1, Math.max(0, h - oh * stepR));
+            kw = Math.min(k - 1, Math.max(0, w - ow * stepC));
+          } else {
+            kh = h - originR;
+            kw = w - originC;
+          }
+          current.sel = [kh, kw, oh, ow];
+        } else {
+          current.sel = parts;
+        }
+        render();
+      }
+      document.getElementById("reveal").addEventListener("click", () => {
+        current.revealed = !current.revealed;
+        if (current.quiz === "strides") {
+          if (current.revealed) {
+            current.draft = [current.sTr, current.sTc, current.sWr, current.sWc].map(String);
+            current.strideOk = true;
+            current.checked = true;
+          } else {
+            current.draft = ["", "", "", ""];
+            current.strideOk = false;
+            current.checked = false;
+          }
+          strideExample = null;
+        }
+        render();
+      });
+      document.getElementById("stride-check").addEventListener("click", checkStrides);
+      document.getElementById("stride-quiz").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          checkStrides();
+        }
+      });
+      document.getElementById("guide-toggle").addEventListener("click", () => {
+        const guide = document.getElementById("guide");
+        const closed = !guide.hidden;
+        guide.hidden = closed;
+        document.getElementById("shell").classList.toggle("closed", closed);
+        document.getElementById("guide-toggle").setAttribute("aria-expanded", String(!closed));
+      });
+      const hash = location.hash.slice(1);
+      const aliases = { nested: "windows", flat: "row5", row8: "row5", col8: "col5" };
+      const start = aliases[hash] || hash;
+      selectExample(byId[start] ? start : "row5");
+    </script>
+  </body>
+</html>
